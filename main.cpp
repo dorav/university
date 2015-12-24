@@ -6,6 +6,7 @@
  */
 #include <math.h>
 #include <stdlib.h>
+#include <algorithm>
 #include <array>
 #include <iostream>
 #include <vector>
@@ -17,7 +18,6 @@
 #include <sstream>
 
 #include "heap.h"
-#include "unlimited.h"
 
 using namespace std::chrono;
 using std::endl;
@@ -26,6 +26,10 @@ using std::vector;
 
 using namespace AlgorithmsMaman14;
 
+const int DHEAP_MAX = 5;
+const int DHEAP_MIN = 2;
+
+// Helper method for printing the statistics
 template <typename Counters>
 ostream& printCounters(ostream& out, int d, int numberOfRuns)
 {
@@ -36,9 +40,12 @@ ostream& printCounters(ostream& out, int d, int numberOfRuns)
 			   << "took " << (Counters::getOverallCounters(d).timeToSort.count() / numberOfRuns ) << "us";
 }
 
+// Helper class for measuring statistics
 class Counters
 {
 public:
+	// Used to collect data over time, the index can be used to keep track of several statistics
+	// In this case, index will be the 'd' parameter of the DHeap
 	static Counters& getOverallCounters(int index)
 	{
 		static std::unordered_map<int, Counters> overall;
@@ -52,18 +59,20 @@ public:
 		*this = Counters();
 	}
 
-	void addStaticCounters(int index, microseconds timeToSord)
+	// Used to combine data collected after a single event into the total
+	void addStaticCounters(int index, microseconds timeToSort)
 	{
 		auto& counters = getStaticCounters();
 		auto& overall = getOverallCounters(index);
 		overall.compareCounter += counters.compareCounter;
 		overall.emplaceCounter += counters.emplaceCounter;
 		overall.copyCounter += counters.copyCounter;
-		overall.timeToSort += timeToSord;
+		overall.timeToSort += timeToSort;
 
 		counters.reset();
 	}
 
+	// Use this to increase counters of a specific event and then use reset
 	static Counters& getStaticCounters()
 	{
 		static Counters c;
@@ -97,7 +106,7 @@ struct CountInteger
 		Counters::getStaticCounters().emplaceCounter++;
 	}
 
-	CountInteger& operator=(const CountInteger& other)
+	CountInteger& operator=(CountInteger&& other)
 	{
 		Counters::getStaticCounters().emplaceCounter++;
 		real = std::move(other.real);
@@ -106,7 +115,7 @@ struct CountInteger
 
 	operator const Comperable&() const { return real; }
 
-	bool operator > (const CountInteger& other) const
+	bool operator>(const CountInteger& other) const
 	{
 		Counters::getStaticCounters().compareCounter++;
 		return real > other.real;
@@ -115,29 +124,32 @@ struct CountInteger
 	Comperable real;
 };
 
-template <typename Heap, typename Counter = Counters>
-void printSons(const Heap& heap, std::size_t length)
-{
-	for (auto i = 0u; i < length; ++i)
-	{
-		cout << "Heap[" << i << "] = " << heap[i] << endl;
-	}
-}
-
 typedef DHeap<CountInteger<int>> Heap;
 
+template <typename Heap>
+void printHeap(ostream& out, const Heap& heap, std::size_t length)
+{
+	out << "{ ";
+	for (auto i = 0u; i < length; ++i)
+		out << "{ " << i << " : " << heap[i] << " }, ";
+	out << " }";
+}
+
 template <typename Heap, typename Counter = Counters>
-void assertSorted(const Heap&, std::size_t originalSize, const Heap& heap, std::size_t length)
+void assertSorted(std::size_t originalSize, const Heap& heap, std::size_t length)
 {
 	if (originalSize != length)
 		throw std::runtime_error("Sorted array length != original array length");
 
-	for (auto i = 0u; i < length - 1; ++i)
+	if (length < 2)
+		return;
+
+	for (unsigned int i = 0; i < length - 1; ++i)
 	{
-		if (heap[i] > heap[i+1])
+		if (heap[i] > heap[i + 1])
 		{
-			for (unsigned int i = 0; i < heap.size(); ++i)
-				cout << "[" << i << "]" << heap[i] << endl;
+			cerr << "Following array is not sorted: ";
+			printHeap(cerr, heap, length);
 			stringstream err; err << "[" << i << "] = " << heap[i] << " <= " << heap[i+1] << " = [" << i + 1 << "]";
 			throw std::runtime_error("Array not sorted" + err.str());
 		}
@@ -165,11 +177,11 @@ void trackSortWith(std::size_t d, T& toSort)
 template <typename T>
 void sortWithDifferentDHeaps(const T& original)
 {
-	for (int d = 2; d < 7; ++d)
+	for (int d = DHEAP_MIN; d < DHEAP_MAX; ++d)
 	{
-		auto toSort = original;
-		trackSortWith(d, toSort);
-		assertSorted(original, original.size(), toSort, toSort.size());
+		auto toSort = original; // copying the original string, to work with same input every time.
+		trackSortWith(d, toSort); // sorting with a specific DHeap while tracking the number of compares, copies and emplacements.
+		assertSorted(original.size(), toSort, toSort.size()); // making sure the array is indeed sorted.
 	}
 }
 
@@ -188,28 +200,41 @@ void sortNElements(int arraySizeToSort)
 	std::vector<CountInteger<int> > original;
 
 	for (int i = 0; i < arraySizeToSort; ++i)
-		original.push_back(randomize());
+		original.emplace_back(randomize());
 
 	sortWithDifferentDHeaps(original);
 }
 
-void measureDHeapSorts(int arraySizeToSort)
+void printSortStatistics(int arraySizeToSort, int d, int reps)
 {
-	for (int repetition = 0; repetition < 10; ++repetition)
-		sortNElements(arraySizeToSort);
+	cout << "Sorting " << arraySizeToSort << " elements with d = " << d << " ";
+	printCounters<Counters>(cout, d, reps) << endl;
+}
 
-	for (int d = 2; d < 7; ++d)
+void collectStatistics(int arraySizeToSort, int reps)
+{
+	for (int d = DHEAP_MIN; d < DHEAP_MAX; ++d)
 	{
-		cout << "Sorting " << arraySizeToSort << " elements with d = " << d << " ";
-		printCounters<Counters>(cout, d, 2000) << endl;
+		printSortStatistics(arraySizeToSort, d, reps);
 		Counters::getOverallCounters(d).reset();
 	}
 }
 
+void repeatSorting(int arraySizeToSort, int reps)
+{
+	for (int i = 0; i < reps; ++i)
+		sortNElements(arraySizeToSort);
+}
+
+void measureDHeapSorts(int arraySizeToSort)
+{
+	int reps = 100;
+	repeatSorting(arraySizeToSort, 100);
+	collectStatistics(arraySizeToSort, reps);
+}
+
 int main()
 {
-	std::mt19937 generator(time(NULL));
-
 	measureDHeapSorts(50);
 	measureDHeapSorts(100);
 	measureDHeapSorts(200);

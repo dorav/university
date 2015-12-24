@@ -41,15 +41,19 @@ public:
 	operator string() const;
 	bool operator ==(const string& str) const;
 	bool operator>(const Unlimited& other) const;
+	bool operator<(const Unlimited& other) const;
 
 	void operator=(Unlimited&& other);
+	void operator=(const Unlimited& other);
 private:
+
 	class LeadingZerosVector : public vector<int>
 	{
 	public:
 		LeadingZerosVector() = default;
 		LeadingZerosVector(LeadingZerosVector&&) = default;
 		LeadingZerosVector(const LeadingZerosVector&) = default;
+		LeadingZerosVector& operator=(const LeadingZerosVector&) = default;
 		LeadingZerosVector& operator=(LeadingZerosVector&&) = default;
 
 		int& operator[](unsigned int i);
@@ -70,7 +74,8 @@ private:
 	typedef LeadingZerosVector LZVector;
 
 	static OrderedCouple orderByAbsoluteValue(const Unlimited& first, const Unlimited& other);
-	bool isAbsolutlyBigger(const Unlimited& other) const;
+	template <typename CompMethod>
+	bool compare(const Unlimited& other, CompMethod comperator) const;
 	void insertMostSignificantDigit(int digit);
 	void parseString(const std::string& value);
 	void parseNonNegativeStringRepresentation(string::const_reverse_iterator begin,

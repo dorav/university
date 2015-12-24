@@ -20,7 +20,7 @@
 
 using namespace std;
 
-static const int BASE = 10000;
+static const int BASE = 10;
 
 struct IndexOutOfRangeException : public std::exception {};
 
@@ -155,9 +155,19 @@ Unlimited& Unlimited::operator++()
 	return *this;
 }
 
+bool IsAbsBigger(int first, int second)
+{
+	return first > second;
+}
+
+bool IsAbsSmaller(int first, int second)
+{
+	return first < second;
+}
+
 Unlimited::OrderedCouple Unlimited::orderByAbsoluteValue(const Unlimited& first, const Unlimited& other)
 {
-	if (first.isAbsolutlyBigger(other))
+	if (first.compare(other, IsAbsBigger))
 		return OrderedCouple(other, first);
 	return OrderedCouple(first, other);
 }
@@ -178,15 +188,16 @@ void Unlimited::operator+=(const Unlimited& other)
 		differentSignAddition(other);
 }
 
-bool Unlimited::isAbsolutlyBigger(const Unlimited& other) const
+template <typename CompMethod>
+bool Unlimited::compare(const Unlimited& other, CompMethod comperator) const
 {
-	if (digits.size() > other.digits.size())
-		return true;
+	if (digits.size() != other.digits.size())
+		return comperator(digits.size(), other.digits.size());
 
-	for (unsigned int i = 0; i < digits.size(); ++i)
+	for (int i = digits.size() - 1 ; i >= 0; --i)
 	{
-		if (digits[i] > other.digits[i])
-			return true;
+		if (digits[i] != other.digits[i])
+			return comperator(digits[i], other.digits[i]);
 	}
 
 	return false;
@@ -195,12 +206,23 @@ bool Unlimited::isAbsolutlyBigger(const Unlimited& other) const
 bool Unlimited::operator>(const Unlimited& other) const
 {
 	if (isSameSign(other))
-		return isAbsolutlyBigger(other) == isNegative;
+		return compare(other, IsAbsBigger) && isNegative == false;
 
 	if (isNegative)
 		return false;
 
 	return true;
+}
+
+bool Unlimited::operator<(const Unlimited& other) const
+{
+	if (isSameSign(other))
+		return compare(other, IsAbsSmaller) && isNegative == false;
+
+	if (isNegative)
+		return true;
+
+	return false;
 }
 
 void Unlimited::operator-=(const Unlimited& other)
@@ -319,6 +341,12 @@ void Unlimited::swap(Unlimited& first, Unlimited& second)
 {
 	std::swap(first.digits, second.digits);
 	std::swap(first.isNegative, second.isNegative);
+}
+
+void Unlimited::operator =(const Unlimited& other)
+{
+	digits = other.digits;
+	isNegative = other.isNegative;
 }
 
 void Unlimited::operator =(Unlimited&& other)
