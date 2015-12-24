@@ -18,42 +18,11 @@ template <typename T, typename RandomAccessStorage = std::vector<T>>
 class DHeap
 {
 public:
-	/* This constructor should be used for most cases.
-	 * It takes ownership of a datastructure and converts it into a heap.
-	 */
-	DHeap(std::size_t numberOfSons_, RandomAccessStorage&& data)
-	: numberOfSons(numberOfSons_)
-	, data(std::forward<RandomAccessStorage>(data))
-	{
-		// The API supports receiving a storage and converting it into a heap.
-		cout << "DORAV - construction " << endl;
-		build_max_heap();
-	}
-
-	/* This constructor should be used when initializing the heap with
-	 * a copy of the data structure.
-	 *
-	 * Note: This is a heavy job constructing a copy, running at linear time.
-	 * 		 You probably want to use a move constructor and allow the heap
-	 * 		 to take ownership of the data.
-	 */
-	DHeap(std::size_t numberOfSons_, const RandomAccessStorage& data)
-	: DHeap(numberOfSons_, data)
-	{
-	}
-
-	/* This constructor should be used when initializing from an array and taking ownership on it
-	 * The array should never be changed by an outside entity!
-	 */
-	DHeap(std::size_t numberOfSons_, T* array, std::size_t length_)
-	: DHeap(numberOfSons_, array, length)
-	{
-	}
-
-
 	/* The design allows placing specialized datastructures as storage.
-	 * Some of them require more parameters for construction
-	 * (eg. c-style array requires the length)
+	 * Some of them requires different parameters for construction.
+	 * (e.g c-style array requires ArrayData)
+	 *
+	 * In order to know which parameters to pass, take a look at the DHeapData class
 	 */
 	template <typename... Args>
 	DHeap(std::size_t numberOfSons_, Args&&... args)
@@ -65,9 +34,8 @@ public:
 	}
 
 	/* This constructor is used to build a heap onto the DataStructure without
-	 * using the entire provided DataStructure.
+	 * using the entire DataStructure.
 	 */
-
 	template <typename... Args>
 	DHeap(std::size_t numberOfSons_, std::size_t heapSize, Args&&... args)
 	: numberOfSons(numberOfSons_)
@@ -75,33 +43,6 @@ public:
 	{
 		// The API supports receiving a storage and converting it into a heap.
 		build_max_heap();
-	}
-
-	/* NOTE: After calling this method the heap will no longer be a heap!
-	 * Any calls to beginChild() will cause undefined behavior!
-	 * As the structure is no longer a heap, the root method no longer returns the root.
-	 * isEmpty(), storage() and length() continue to work as usual.
-	 *
-	 * NOTE: Breaking the heap property here is intentional as the other
-	 *       solution is copying the heap, which is not always wanted.
-	 *
-	 * NOTE: you can use build_max_heap to validate the object again as heap instead of building a new one.
-	 */
-	void sort()
-	{
-		if (length() <= 1) // Does not need to do anything if one or zero elements.
-			return;
-
-		// Sorting is based on the heap sort algorithm.
-		// The heap property is kept in the range [0.. i]
-		// While the range [i..length() -1] gets sorted values.
-		for (std::size_t i = data.length() - 1; i >= 1; --i)
-		{
-			// Removing the biggest value from the heap at range [0 .. i - 1]
-			std::swap(*data[0], *data[i]);
-			data.heapSize--;
-			max_heapify(0);
-		}
 	}
 
 	struct HeapIsEmptyException : public std::runtime_error { HeapIsEmptyException() : std::runtime_error("root method called on empty heap"){} };
@@ -115,12 +56,14 @@ public:
 		return *data[0];
 	}
 
-	// Pushes a copy of obj into the heap
+	/* Pushes a copy of obj into the heap
+	 * Proof of concept to support priority queue
+	 */
 	void push(const T& obj)
 	{
 		data.push(obj);
 		std::swap(*data[0], *data[data.length()]);
-		max_heapify(0, data.length());
+		max_heapify(0);
 	}
 
 	bool isEmpty() const
@@ -157,6 +100,21 @@ public:
 		// Fixing the root.
 		max_heapify(0);
 	}
+
+	/* NOTE: After calling this method the heap will decrease it's size to one.
+	 * (This is the smallest number of elements that represents a valid heap).
+	 * The stored data can be accessed via the storage() method.
+	 * The length of the sorted array is the number returned by the function.
+	 */
+	std::size_t sort()
+	{
+		auto originalLen = length();
+		if (length() > 1) // Does not need to do anything if one or zero elements.
+			sortImpl();
+
+		return originalLen;
+	}
+
 
 protected:
 	// Corrects the heap property, returns whether the heap was changed or not
@@ -279,7 +237,32 @@ public:
 protected:
 	std::size_t numberOfSons;
 	DHeapData<T, RandomAccessStorage> data;
+
+public:
+	void sortImpl()
+	{
+		// Sorting is based on the heap sort algorithm.
+		// The heap property is kept in the range [0.. i]
+		// While the range [i..length() -1] gets sorted values.
+		for (std::size_t i = data.length() - 1; i >= 1; --i)
+		{
+			// Removing the biggest value from the heap at range [0 .. i - 1]
+			std::swap(*data[0], *data[i]);
+			data.heapSize--;
+			max_heapify(0);
+		}
+	}
 };
+
+template <typename T>
+void heap_sort(std::size_t numberOfSons, std::vector<T>& storage)
+{
+	// We want to edit the given data, using the array version of the heap for that.
+	ArrayData<T> array(&storage[0], storage.size());
+	DHeap<T, T*> heap(numberOfSons, array);
+//	DHeap<T> heap(numberOfSons, storage);
+	heap.sort();
+}
 
 }
 

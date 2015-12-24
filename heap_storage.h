@@ -5,9 +5,30 @@
 
 namespace AlgorithmsMaman14{
 
-template <typename T, typename RandomAccessStorage>
-class DHeapData
+// Helper class for storing metadata about the array storage for the heap
+template <typename T>
+struct ArrayData
 {
+	ArrayData(T* array_, std::size_t length)
+	: array(array_)
+	, arrayLength(length)
+	, heapSize(length)
+	{
+	}
+
+	ArrayData(T* array_, std::size_t length, std::size_t heapSize_)
+	: array(array_)
+	, arrayLength(length)
+	, heapSize(heapSize_)
+	{
+	}
+
+	T* array;
+	std::size_t arrayLength;
+	std::size_t heapSize; // needs explicit initialization
+};
+
+
 /*
  * This represents an underlying data holder for the Dheap class.
  * It is required to have random access operator enabled.
@@ -18,19 +39,26 @@ class DHeapData
  * 		 Specialization may be required to support other types.
  *
  * Usage outside of the DHeap implementation is discouraged.
+ * DHeap depends upon some of the data-members and the functions
+ * in this class. If you specialize it, you must write them too.
  */
+template <typename T, typename RandomAccessStorage>
+class DHeapData
+{
 public:
 	DHeapData()
 	: heapSize(0)
 	{
 	}
 
+	// Explicit as this is a heavy copy constructor
 	explicit DHeapData(const RandomAccessStorage& data_)
 	: data(data_)
 	, heapSize(data.size())
 	{
 	}
 
+	// Explicit as this is a heavy copy constructor
 	explicit DHeapData(std::size_t heapSize_, const RandomAccessStorage& data_)
 	: data(data_)
 	, heapSize(heapSize_)
@@ -82,17 +110,10 @@ template <typename T>
 class DHeapData<T, T*>
 {
 public:
-	DHeapData(T* data_, std::size_t length_)
-	: data(data_)
-	, heapSize(length_)
-	, arraySize(length_)
-	{
-	}
-
-	DHeapData(T* data_, std::size_t length_, std::size_t heapSize_)
-	: data(data_)
-	, heapSize(heapSize_)
-	, arraySize(length_)
+	DHeapData(ArrayData<T> array)
+	: data(array.array)
+	, heapSize(array.heapSize)
+	, arraySize(array.heapSize)
 	{
 	}
 
@@ -111,11 +132,11 @@ public:
 		return heapSize;
 	}
 
-	class HeapIsFullException : public std::runtime_error { HeapIsFullException() : std::runtime_error("push into a full heap"){} };
+	struct HeapIsFullException : public std::runtime_error { HeapIsFullException() : std::runtime_error("push into a full heap"){} };
 
 	void push(const T& obj)
 	{
-		if (heapSize + 1 >= arraySize)
+		if (heapSize >= arraySize)
 			throw HeapIsFullException();
 
 		++heapSize;

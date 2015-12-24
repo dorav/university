@@ -10,6 +10,8 @@
 #include <ostream>
 #include <vector>
 #include <cmath>
+#include <random>
+#include <random>
 
 #include "heap.h"
 #include "unlimited.h"
@@ -20,12 +22,12 @@ using std::vector;
 using namespace AlgorithmsMaman14;
 
 template <typename Counters>
-void printCounters(ostream& out)
+ostream& printCounters(ostream& out)
 {
-	out << "compare, emplace, copy = "
-		<< Counters().getStaticCounters().compareCounter << ", "
-		<< Counters().getStaticCounters().emplaceCounter << ", "
-		<< Counters().getStaticCounters().copyCounter << endl;
+	return out << "compare, emplace, copy = "
+			   << Counters().getStaticCounters().compareCounter << ", "
+			   << Counters().getStaticCounters().emplaceCounter << ", "
+			   << Counters().getStaticCounters().copyCounter;
 }
 
 class Counters
@@ -88,43 +90,58 @@ struct CountInteger
 };
 
 template <typename Heap, typename Counter = Counters>
-void printSons(Heap& heap, std::size_t length)
+void printSons(const Heap& heap, std::size_t length)
 {
 	printCounters<Counter>(cout);
 	for (auto i = 0u; i < length; ++i)
 	{
-		cout << "Heap[" << i << "] = " << heap.storage()[i] << endl;
+		cout << "Heap[" << i << "] = " << heap[i] << endl;
 	}
 	printCounters<Counter>(cout);
 }
 
+typedef DHeap<CountInteger<int>> Heap;
+
+template <typename Heap, typename Counter = Counters>
+void assertSorted(const Heap&, std::size_t originalSize, const Heap& heap, std::size_t length)
+{
+	if (originalSize != length)
+		throw std::runtime_error("Sorted array length != original array length");
+
+	for (auto i = 0u; i < length - 1; ++i)
+	{
+		if (heap[i] > heap[i+1])
+			throw std::runtime_error("Array not sorted");
+	}
+}
+
+
+
 int main()
 {
-//	CountInteger<int> a[] = new CountInteger<int>[len];
-//	a[0] = 2;
-//	a[1] = 4;
-//	a[2] = 5;
-	std::vector<CountInteger<int>> a;
-	for (int i = 0; i < 11; ++i)
+	int min = 0;
+	int max = 1024;
+	std::vector<CountInteger<int>> original;
+
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<> distribution(min, max);
+
+	for (int i = 0; i < 50; ++i)
 	{
-		a.push_back(i);
+		original.push_back(distribution(gen));
+		cout << "DORAV - " << original.front() << endl;
 	}
-	Counters().resetStaticCounters();
-//	DHeap<CountInteger<int>, CountInteger<int>*> heap(1, a, len);
-	DHeap<CountInteger<int>> heap(1, a);
-	int len = heap.length();
-//	for (int i = 0; i < 11; ++i)
-//	{
-//		cout << "parent of " << i << " = " << heap.parentOf(i) << endl;
-//	}
 
-
-	printSons(heap, len);
-
-	cout << "Sorting ---------------------------" << endl;
-	heap.sort();
-
-	printSons(heap, len);
+	for (int i = 2; i < 7; ++i)
+	{
+		auto toSort = original;
+		Counters().resetStaticCounters();
+		heap_sort(i, toSort);
+		assertSorted(original, original.size(), toSort, toSort.size());
+		cout << "For d = " << i << " ";
+		printCounters<Counters>(cout) << endl;
+	}
 	return 0;
 }
 
