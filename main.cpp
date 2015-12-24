@@ -177,7 +177,7 @@ void trackSortWith(std::size_t d, T& toSort)
 template <typename T>
 void sortWithDifferentDHeaps(const T& original)
 {
-	for (int d = DHEAP_MIN; d < DHEAP_MAX; ++d)
+	for (int d = DHEAP_MIN; d <= DHEAP_MAX; ++d)
 	{
 		auto toSort = original; // copying the original string, to work with same input every time.
 		trackSortWith(d, toSort); // sorting with a specific DHeap while tracking the number of compares, copies and emplacements.
@@ -213,7 +213,7 @@ void printSortStatistics(int arraySizeToSort, int d, int reps)
 
 void collectStatistics(int arraySizeToSort, int reps)
 {
-	for (int d = DHEAP_MIN; d < DHEAP_MAX; ++d)
+	for (int d = DHEAP_MIN; d <= DHEAP_MAX; ++d)
 	{
 		printSortStatistics(arraySizeToSort, d, reps);
 		Counters::getOverallCounters(d).reset();
