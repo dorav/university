@@ -236,7 +236,9 @@ void measureDHeapSorts(int arraySizeToSort)
 int main()
 {
 	measureDHeapSorts(50);
+	cout << endl;
 	measureDHeapSorts(100);
+	cout << endl;
 	measureDHeapSorts(200);
 
 	return 0;
