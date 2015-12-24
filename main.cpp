@@ -5,16 +5,21 @@
  *      Author: dorav
  */
 #include <math.h>
+#include <stdlib.h>
 #include <array>
 #include <iostream>
-#include <ostream>
 #include <vector>
 #include <cmath>
+#include <ctime>
 #include <random>
-#include <random>
+#include <unordered_map>
+#include <chrono>
+#include <sstream>
 
 #include "heap.h"
 #include "unlimited.h"
+
+using namespace std::chrono;
 using std::endl;
 using std::cout;
 using std::vector;
@@ -22,24 +27,44 @@ using std::vector;
 using namespace AlgorithmsMaman14;
 
 template <typename Counters>
-ostream& printCounters(ostream& out)
+ostream& printCounters(ostream& out, int d, int numberOfRuns)
 {
 	return out << "compare, emplace, copy = "
-			   << Counters().getStaticCounters().compareCounter << ", "
-			   << Counters().getStaticCounters().emplaceCounter << ", "
-			   << Counters().getStaticCounters().copyCounter;
+			   << Counters::getOverallCounters(d).compareCounter / numberOfRuns << ", "
+			   << Counters::getOverallCounters(d).emplaceCounter / numberOfRuns << ", "
+			   << Counters::getOverallCounters(d).copyCounter / numberOfRuns << " - "
+			   << "took " << (Counters::getOverallCounters(d).timeToSort.count() / numberOfRuns ) << "us";
 }
 
 class Counters
 {
 public:
-	void resetStaticCounters()
+	static Counters& getOverallCounters(int index)
 	{
-		auto& counters = getStaticCounters();
-		counters = Counters();
+		static std::unordered_map<int, Counters> overall;
+		if (overall.find(index) == overall.end())
+			overall.emplace(index, Counters());
+		return overall.at(index);
 	}
 
-	Counters& getStaticCounters()
+	void reset()
+	{
+		*this = Counters();
+	}
+
+	void addStaticCounters(int index, microseconds timeToSord)
+	{
+		auto& counters = getStaticCounters();
+		auto& overall = getOverallCounters(index);
+		overall.compareCounter += counters.compareCounter;
+		overall.emplaceCounter += counters.emplaceCounter;
+		overall.copyCounter += counters.copyCounter;
+		overall.timeToSort += timeToSord;
+
+		counters.reset();
+	}
+
+	static Counters& getStaticCounters()
 	{
 		static Counters c;
 		return c;
@@ -48,6 +73,7 @@ public:
 	int compareCounter = 0;
 	int emplaceCounter = 0;
 	int copyCounter = 0;
+	std::chrono::microseconds timeToSort;
 };
 
 template <typename Comperable, typename Counter = Counters>
@@ -62,18 +88,18 @@ struct CountInteger
 	CountInteger(const CountInteger& other)
 	: real(other.real)
 	{
-		Counter().getStaticCounters().copyCounter++;
+		Counters::getStaticCounters().copyCounter++;
 	}
 
 	CountInteger(CountInteger&& other)
 	: real(std::move(other.real))
 	{
-		Counter().getStaticCounters().emplaceCounter++;
+		Counters::getStaticCounters().emplaceCounter++;
 	}
 
 	CountInteger& operator=(const CountInteger& other)
 	{
-		Counter().getStaticCounters().emplaceCounter++;
+		Counters::getStaticCounters().emplaceCounter++;
 		real = std::move(other.real);
 		return *this;
 	}
@@ -82,7 +108,7 @@ struct CountInteger
 
 	bool operator > (const CountInteger& other) const
 	{
-		Counter().getStaticCounters().compareCounter++;
+		Counters::getStaticCounters().compareCounter++;
 		return real > other.real;
 	}
 
@@ -92,12 +118,10 @@ struct CountInteger
 template <typename Heap, typename Counter = Counters>
 void printSons(const Heap& heap, std::size_t length)
 {
-	printCounters<Counter>(cout);
 	for (auto i = 0u; i < length; ++i)
 	{
 		cout << "Heap[" << i << "] = " << heap[i] << endl;
 	}
-	printCounters<Counter>(cout);
 }
 
 typedef DHeap<CountInteger<int>> Heap;
@@ -111,37 +135,85 @@ void assertSorted(const Heap&, std::size_t originalSize, const Heap& heap, std::
 	for (auto i = 0u; i < length - 1; ++i)
 	{
 		if (heap[i] > heap[i+1])
-			throw std::runtime_error("Array not sorted");
+		{
+			for (unsigned int i = 0; i < heap.size(); ++i)
+				cout << "[" << i << "]" << heap[i] << endl;
+			stringstream err; err << "[" << i << "] = " << heap[i] << " <= " << heap[i+1] << " = [" << i + 1 << "]";
+			throw std::runtime_error("Array not sorted" + err.str());
+		}
 	}
 }
 
+template <typename T>
+microseconds timedSort(int heapSons, T& toSort)
+{
+	auto start = steady_clock::now();
+	heap_sort(heapSons, toSort);
+	auto end = steady_clock::now();
 
+	return duration_cast<microseconds> (end - start);
+}
 
-int main()
+template <typename T>
+void trackSortWith(std::size_t d, T& toSort)
+{
+	Counters().getStaticCounters().reset();
+	auto timeToSort = timedSort(d, toSort);
+	Counters().addStaticCounters(d, timeToSort);
+}
+
+template <typename T>
+void sortWithDifferentDHeaps(const T& original)
+{
+	for (int d = 2; d < 7; ++d)
+	{
+		auto toSort = original;
+		trackSortWith(d, toSort);
+		assertSorted(original, original.size(), toSort, toSort.size());
+	}
+}
+
+int randomize()
 {
 	int min = 0;
 	int max = 1024;
-	std::vector<CountInteger<int>> original;
+	static std::mt19937 generator(time(NULL));
+	static std::uniform_int_distribution<> distribution (min, max);
 
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_int_distribution<> distribution(min, max);
+	return distribution(generator);
+}
 
-	for (int i = 0; i < 50; ++i)
+void sortNElements(int arraySizeToSort)
+{
+	std::vector<CountInteger<int> > original;
+
+	for (int i = 0; i < arraySizeToSort; ++i)
+		original.push_back(randomize());
+
+	sortWithDifferentDHeaps(original);
+}
+
+void measureDHeapSorts(int arraySizeToSort)
+{
+	for (int repetition = 0; repetition < 10; ++repetition)
+		sortNElements(arraySizeToSort);
+
+	for (int d = 2; d < 7; ++d)
 	{
-		original.push_back(distribution(gen));
-		cout << "DORAV - " << original.front() << endl;
+		cout << "Sorting " << arraySizeToSort << " elements with d = " << d << " ";
+		printCounters<Counters>(cout, d, 2000) << endl;
+		Counters::getOverallCounters(d).reset();
 	}
+}
 
-	for (int i = 2; i < 7; ++i)
-	{
-		auto toSort = original;
-		Counters().resetStaticCounters();
-		heap_sort(i, toSort);
-		assertSorted(original, original.size(), toSort, toSort.size());
-		cout << "For d = " << i << " ";
-		printCounters<Counters>(cout) << endl;
-	}
+int main()
+{
+	std::mt19937 generator(time(NULL));
+
+	measureDHeapSorts(50);
+	measureDHeapSorts(100);
+	measureDHeapSorts(200);
+
 	return 0;
 }
 
