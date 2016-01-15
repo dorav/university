@@ -8,6 +8,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <string.h>
+#include <ctype.h>
+#include <limits.h>
 
 #define NO_ARGUMENTS 1
 #define NOT_ENOUGH_ARGUMENTS 2
@@ -31,7 +34,7 @@ void printUsage(char* programName)
  */
 int isPositive(const char* input)
 {
-	while (*input != NULL)
+	while (*input != '\0')
 	{
 		if (*input == '-')
 			return NEGATIVE;
@@ -53,7 +56,7 @@ int isCharacterNumberInvalid(const char* input, unsigned long* result)
 {
 	char* firstBadChar;
 	unsigned long tempValue = strtoul(input, &firstBadChar, 10);
-	if (*firstBadChar == NULL && errno != ERANGE && isPositive(input) == POSITIVE)
+	if (*firstBadChar == '\0' && errno != ERANGE && isPositive(input) == POSITIVE)
 	{
 		*result = tempValue;
 		return 0;
@@ -115,7 +118,7 @@ void printCharNOfFile(unsigned long n, char* fileName)
 	else
 		printf("The following file did not have %lu characters in it, %s\n", n + 1, fileName);
 
-	close(file);
+	fclose(file);
 }
 
 /*
@@ -125,7 +128,7 @@ void printCharNOfFile(unsigned long n, char* fileName)
 void printNthOfFiles(int numberOfFiles, char* files[], unsigned long characterNumber)
 {
 	int i;
-	printf("Showing character number %d of %d files\n", characterNumber, numberOfFiles);
+	printf("Showing character number %lu of %d files\n", characterNumber, numberOfFiles);
 	for (i = 0; i < numberOfFiles; ++i)
 		printCharNOfFile(characterNumber - 1, files[i]);
 }
@@ -172,7 +175,7 @@ unsigned long getCharacterNumberFromArgs(char* argv[])
 	if (isCharacterNumberInvalid(characterNumArgument, &characterNum) || characterNum == 0)
 	{
 		printf("Invalid 1'st parameter [character-number], must be positive integer "
-			   "(zero not included) and smaller then %lu. Was given - '%s'.\n",	ULONG_MAX, characterNumArgument);
+		       "(zero not included) and smaller then %lu. Was given - '%s'.\n", ULONG_MAX, characterNumArgument);
 		USAGE;
 		exit(BAD_CHARACTERS_NUMBER);
 	}

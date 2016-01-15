@@ -1,0 +1,3 @@
+Bad usage - no arguments given
+Usage: ./n_char [character-number] [file-list...]
+For example - ./n_char 5 /tmp/first.in /tmp/second.in
