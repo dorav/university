@@ -115,15 +115,19 @@ typedef struct
 } UserCommand;
 
 #define OPCODE_LOCATION 6
-#define OPCODE_MASK 0xF /* 4 bits */
+#define OPCODE_MASK (0xF << OPCODE_LOCATION)
+
+/* This define is here for compile-time calculation
+ * Compile time calculation is needed in c90 for {} initialization of structs */
+#define OPCODE_TO_BINARY(opcode) ((opcode << OPCODE_LOCATION) & OPCODE_MASK)
 
 void putCommandOpcode(CPUInstruction* dest, CommandOpcode value)
 {
-	dest->bits &= (OPCODE_MASK << OPCODE_LOCATION); /* set all opcode bits off */
-	dest->bits |= (value << OPCODE_LOCATION); /* set only the wanted bits on */
+	dest->bits &= (!OPCODE_MASK); /* set all opcode bits off */
+	dest->bits ^= OPCODE_TO_BINARY(value); /* set only the wanted bits on */
 }
 
-void parseStopCommand(Line* line, CPUInstruction* instruction, UserCommand* command)
+void parseNoArgsCommand(Line* line, CPUInstruction* instruction, UserCommand* command)
 {
 	char* argument;
 	argument = strtok(NULL, space_chars);
@@ -136,6 +140,76 @@ void parseStopCommand(Line* line, CPUInstruction* instruction, UserCommand* comm
 	}
 }
 
+#define COMMANDS_TABLE_SIZE 29 /* Least bigger prime bigger then size of (ABC..)*/
+
+UserCommand commands[COMMANDS_TABLE_SIZE] = { 0 };
+
+/* Internal function for calculating a given command's hash code.
+ * command parameter must not be NULL.
+ *
+ * Do not try to use it for a general case hash table.
+ * It is a very specific implementation for hashing the given commands.
+ */
+unsigned int prehashCommand(const char* command)
+{
+	/* Good enough prehash for this use-case.
+	 * All valid commands are length < 5 and small letters*/
+	return command[0] - 'a';
+}
+
+/* Specific hash function for the open addressed command hash table.
+ * This is a very bad hash function for general use, do not use it else-where.
+ *
+ * The hash is good enough for the pre-defined set of commands as i know that given
+ * the pre-hash function above, it will provide a very small amount of collisions. */
+int hashCommand(int prehashCommand, int i)
+{
+	return (prehashCommand + i) % COMMANDS_TABLE_SIZE;
+}
+
+void insertCommand(UserCommand commandsTable[], const UserCommand*  insertMe)
+{
+	unsigned int prehash = prehashCommand(insertMe->name);
+	int hashNum = 0;
+	int hash = hashCommand(prehash, hashNum);
+
+	/* Finding the first free spot in the hash table while assuming a free spot exists.
+	 * Also, this assumes that the element was not already inserted into the hash table. */
+	while (strcmp(commandsTable[hash].name, "") != 0)
+		hash = hashCommand(prehash, ++hashNum);
+
+	memcpy(&(commandsTable[hash]), insertMe, sizeof(UserCommand));
+}
+
+#define Equal 1
+#define NotEqual 0
+
+int isEqual(const UserCommand* cmd, const char* name)
+{
+	return strcmp(cmd->name, name) == 0;
+}
+
+#define NotFound ""
+
+UserCommand* findCommand(const char* name)
+{
+	unsigned int prehash = prehashCommand(name);
+	int hashNum = 0;
+	int hash = hashCommand(prehash, hashNum);
+	UserCommand* i;
+
+	/* Looking in hash table. May find hash colliding elements. */
+	for (i = &(commands[hash]); isEqual(i, name) == NotEqual; i = &(commands[hash]))
+	{
+		/* Not found. Promised to happen as table has free spots. */
+		if (isEqual(i, NotFound) == Equal)
+			return NULL;
+		hash = hashCommand(prehash, ++hashNum);
+	}
+
+	return &(commands[hash]);
+}
+
 UserCommand rtsCommand = { RtsOpcode, "rts" };
 UserCommand stopCommand = { StopOpcode, "stop" };
 
@@ -143,19 +217,16 @@ CPUInstruction parseLine(Line* line)
 {
 	CPUInstruction i = {0};
 
-	char* command = strtok(line->data, space_chars);
+	char* commandName = strtok(line->data, space_chars);
+	UserCommand* command = findCommand(commandName);
 
-	if (strcmp(command, stopCommand.name) == 0)
+	if (command != NULL)
 	{
-		parseStopCommand(line, &i, &stopCommand);
-	}
-	else if (strcmp(command, rtsCommand.name) == 0)
-	{
-		parseStopCommand(line, &i, &rtsCommand);
+		parseNoArgsCommand(line, &i, command);
 	}
 	else
 	{
-		printf("line %d: No such command \"%s\"\n", line->lineNumber, command);
+		printf("line %d: No such command \"%s\"\n", line->lineNumber, commandName);
 		line->hasError = TRUE;
 	}
 
@@ -311,6 +382,9 @@ int main(int argc, char** argv)
 	{
 		puts("BAD FILE");
 	}
+
+	insertCommand(commands, &stopCommand);
+	insertCommand(commands, &rtsCommand);
 
 	firstRun(inputFile, &data);
 
