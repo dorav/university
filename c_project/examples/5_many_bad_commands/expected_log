@@ -1,0 +1,4 @@
+line 1: No such command "hello"
+line 2: No such command "yes"
+line 3: invalid arguments after "stop". Expected '0' arguments.
+line 6: invalid arguments after "stop". Expected '0' arguments.
