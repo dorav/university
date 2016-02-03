@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "types.h"
 #define MAX_LINE_SIZE 100
 #define FALSE 0
 #define TRUE 1
@@ -37,7 +38,7 @@ LineType defaultLineType()
 	return returnValue;
 }
 
-short isEmpty(char* line)
+short isSpaces(const char* line)
 {
 	while (*line)
 		if (! isspace(*line))
@@ -48,13 +49,25 @@ short isEmpty(char* line)
 	return 1;
 }
 
+#define COMMANDS_TABLE_SIZE 29 /* Least bigger prime bigger then size of (ABC..)*/
+
+typedef struct
+{
+	unsigned int instruction_counter;
+	unsigned int data_counter;
+	unsigned int numberOfErrors;
+
+	UserCommand* commands;
+	unsigned int commandsTableSize;
+} ProgramData;
+
 LineType getLineType(Line* line)
 {
 	LineType returnValue = defaultLineType();
 
 	if (line->data[0] == ';')
 		returnValue.isComment = TRUE;
-	else if (isEmpty(line->data))
+	else if (isSpaces(line->data))
 		returnValue.isEmptyLine = TRUE;
 	else
 		returnValue.isParsingRequired = TRUE;
@@ -97,23 +110,6 @@ FILE* getObjectOutFile()
 	return fopen("ps.ob", "w");
 }
 
-typedef struct
-{
-	unsigned int bits;
-} CPUInstruction;
-
-typedef enum
-{
-	RtsOpcode = 14,
-	StopOpcode = 15
-} CommandOpcode;
-
-typedef struct
-{
-	CommandOpcode opcode;
-	char name[5];
-} UserCommand;
-
 #define OPCODE_LOCATION 6
 #define OPCODE_MASK (0xF << OPCODE_LOCATION)
 
@@ -129,20 +125,15 @@ void putCommandOpcode(CPUInstruction* dest, CommandOpcode value)
 
 void parseNoArgsCommand(Line* line, CPUInstruction* instruction, UserCommand* command)
 {
-	char* argument;
-	argument = strtok(NULL, space_chars);
+	char* argument = strtok(NULL, space_chars);
 
-	if (argument == NULL || isEmpty(argument))
+	if (argument == NULL || isSpaces(argument))
 		putCommandOpcode(instruction, command->opcode);
 	else
 	{
 		printf("line %d: invalid arguments after \"%s\". Expected '0' arguments.\n", line->lineNumber, command->name);
 	}
 }
-
-#define COMMANDS_TABLE_SIZE 29 /* Least bigger prime bigger then size of (ABC..)*/
-
-UserCommand commands[COMMANDS_TABLE_SIZE] = { 0 };
 
 /* Internal function for calculating a given command's hash code.
  * command parameter must not be NULL.
@@ -162,21 +153,21 @@ unsigned int prehashCommand(const char* command)
  *
  * The hash is good enough for the pre-defined set of commands as i know that given
  * the pre-hash function above, it will provide a very small amount of collisions. */
-int hashCommand(int prehashCommand, int i)
+int hashCommand(int nonUniqueValue, unsigned int iteration, unsigned int tableSize)
 {
-	return (prehashCommand + i) % COMMANDS_TABLE_SIZE;
+	return (nonUniqueValue + iteration) % tableSize;
 }
 
-void insertCommand(UserCommand commandsTable[], const UserCommand*  insertMe)
+void insertCommand(UserCommand* commandsTable, unsigned int tableSize, const UserCommand*  insertMe)
 {
 	unsigned int prehash = prehashCommand(insertMe->name);
 	int hashNum = 0;
-	int hash = hashCommand(prehash, hashNum);
+	int hash = hashCommand(prehash, hashNum, tableSize);
 
 	/* Finding the first free spot in the hash table while assuming a free spot exists.
 	 * Also, this assumes that the element was not already inserted into the hash table. */
 	while (strcmp(commandsTable[hash].name, "") != 0)
-		hash = hashCommand(prehash, ++hashNum);
+		hash = hashCommand(prehash, ++hashNum, tableSize);
 
 	memcpy(&(commandsTable[hash]), insertMe, sizeof(UserCommand));
 }
@@ -191,11 +182,11 @@ int isEqual(const UserCommand* cmd, const char* name)
 
 #define NotFound ""
 
-UserCommand* findCommand(const char* name)
+UserCommand* findCommand(UserCommand commands[], unsigned int tableSize, const char* name)
 {
 	unsigned int prehash = prehashCommand(name);
 	int hashNum = 0;
-	int hash = hashCommand(prehash, hashNum);
+	int hash = hashCommand(prehash, hashNum, tableSize);
 	UserCommand* i;
 
 	/* Looking in hash table. May find hash colliding elements. */
@@ -204,7 +195,7 @@ UserCommand* findCommand(const char* name)
 		/* Not found. Promised to happen as table has free spots. */
 		if (isEqual(i, NotFound) == Equal)
 			return NULL;
-		hash = hashCommand(prehash, ++hashNum);
+		hash = hashCommand(prehash, ++hashNum, tableSize);
 	}
 
 	return &(commands[hash]);
@@ -213,12 +204,12 @@ UserCommand* findCommand(const char* name)
 UserCommand rtsCommand = { RtsOpcode, "rts" };
 UserCommand stopCommand = { StopOpcode, "stop" };
 
-CPUInstruction parseLine(Line* line)
+CPUInstruction parseLine(ProgramData* data, Line* line)
 {
 	CPUInstruction i = {0};
 
 	char* commandName = strtok(line->data, space_chars);
-	UserCommand* command = findCommand(commandName);
+	UserCommand* command = findCommand(data->commands, data->commandsTableSize, commandName);
 
 	if (command != NULL)
 	{
@@ -232,13 +223,6 @@ CPUInstruction parseLine(Line* line)
 
 	return i;
 }
-
-typedef struct
-{
-	unsigned int instruction_counter;
-	unsigned int data_counter;
-	unsigned int numberOfErrors;
-} ProgramData;
 
 char to_32bit(unsigned int value)
 {
@@ -338,7 +322,7 @@ void firstRun(FILE* inputFile,
 
 		if (shouldIgnoreLine(&instruction) == FALSE)
 		{
-			validateInstruction(data, parseLine(&line));
+			validateInstruction(data, parseLine(data, &line));
 			if (line.hasError == TRUE)
 				++(data->numberOfErrors);
 		}
@@ -358,7 +342,7 @@ void secondRun(ProgramData* data,
 
 		if (shouldIgnoreLine(&instruction) == FALSE)
 		{
-			printInstruction(objectOutFile, data, parseLine(&l));
+			printInstruction(objectOutFile, data, parseLine(data, &l));
 			data->instruction_counter += 1;
 		}
 	}
@@ -369,7 +353,10 @@ int main(int argc, char** argv)
 	FILE* inputFile;
 	FILE* objectOutFile;
 	ProgramData data = {0};
+
 	FILE* status = freopen("log", "w", stdout);
+	data.commands = (UserCommand*)calloc(COMMANDS_TABLE_SIZE, sizeof(UserCommand));
+	data.commandsTableSize = COMMANDS_TABLE_SIZE;
 
 	if (status == NULL)
 		puts("Bad redirect");
@@ -383,8 +370,8 @@ int main(int argc, char** argv)
 		puts("BAD FILE");
 	}
 
-	insertCommand(commands, &stopCommand);
-	insertCommand(commands, &rtsCommand);
+	insertCommand(data.commands, data.commandsTableSize, &stopCommand);
+	insertCommand(data.commands, data.commandsTableSize, &rtsCommand);
 
 	firstRun(inputFile, &data);
 
