@@ -10,6 +10,7 @@
 #include <string.h>
 
 #include "types.h"
+#include "hash_table.h"
 #define MAX_LINE_SIZE 100
 #define FALSE 0
 #define TRUE 1
@@ -49,16 +50,12 @@ short isSpaces(const char* line)
 	return 1;
 }
 
-#define COMMANDS_TABLE_SIZE 29 /* Least bigger prime bigger then size of (ABC..)*/
-
 typedef struct
 {
 	unsigned int instruction_counter;
 	unsigned int data_counter;
 	unsigned int numberOfErrors;
-
-	UserCommand* commands;
-	unsigned int commandsTableSize;
+	hash_table cmds;
 } ProgramData;
 
 LineType getLineType(Line* line)
@@ -123,7 +120,7 @@ void putCommandOpcode(CPUInstruction* dest, CommandOpcode value)
 	dest->bits ^= OPCODE_TO_BINARY(value); /* set only the wanted bits on */
 }
 
-void parseNoArgsCommand(Line* line, CPUInstruction* instruction, UserCommand* command)
+void parseNoArgsCommand(const Line* line, CPUInstruction* instruction, const UserCommand* command)
 {
 	char* argument = strtok(NULL, space_chars);
 
@@ -141,35 +138,11 @@ void parseNoArgsCommand(Line* line, CPUInstruction* instruction, UserCommand* co
  * Do not try to use it for a general case hash table.
  * It is a very specific implementation for hashing the given commands.
  */
-unsigned int prehashCommand(const char* command)
+unsigned int prehashCommand(ObjectType command)
 {
 	/* Good enough prehash for this use-case.
 	 * All valid commands are length < 5 and small letters*/
-	return command[0] - 'a';
-}
-
-/* Specific hash function for the open addressed command hash table.
- * This is a very bad hash function for general use, do not use it else-where.
- *
- * The hash is good enough for the pre-defined set of commands as i know that given
- * the pre-hash function above, it will provide a very small amount of collisions. */
-int hashCommand(int nonUniqueValue, unsigned int iteration, unsigned int tableSize)
-{
-	return (nonUniqueValue + iteration) % tableSize;
-}
-
-void insertCommand(UserCommand* commandsTable, unsigned int tableSize, const UserCommand*  insertMe)
-{
-	unsigned int prehash = prehashCommand(insertMe->name);
-	int hashNum = 0;
-	int hash = hashCommand(prehash, hashNum, tableSize);
-
-	/* Finding the first free spot in the hash table while assuming a free spot exists.
-	 * Also, this assumes that the element was not already inserted into the hash table. */
-	while (strcmp(commandsTable[hash].name, "") != 0)
-		hash = hashCommand(prehash, ++hashNum, tableSize);
-
-	memcpy(&(commandsTable[hash]), insertMe, sizeof(UserCommand));
+	return ((const char*) command)[0] - 'a';
 }
 
 #define Equal 1
@@ -182,25 +155,6 @@ int isEqual(const UserCommand* cmd, const char* name)
 
 #define NotFound ""
 
-UserCommand* findCommand(UserCommand commands[], unsigned int tableSize, const char* name)
-{
-	unsigned int prehash = prehashCommand(name);
-	int hashNum = 0;
-	int hash = hashCommand(prehash, hashNum, tableSize);
-	UserCommand* i;
-
-	/* Looking in hash table. May find hash colliding elements. */
-	for (i = &(commands[hash]); isEqual(i, name) == NotEqual; i = &(commands[hash]))
-	{
-		/* Not found. Promised to happen as table has free spots. */
-		if (isEqual(i, NotFound) == Equal)
-			return NULL;
-		hash = hashCommand(prehash, ++hashNum, tableSize);
-	}
-
-	return &(commands[hash]);
-}
-
 UserCommand rtsCommand = { RtsOpcode, "rts" };
 UserCommand stopCommand = { StopOpcode, "stop" };
 
@@ -209,7 +163,7 @@ CPUInstruction parseLine(ProgramData* data, Line* line)
 	CPUInstruction i = {0};
 
 	char* commandName = strtok(line->data, space_chars);
-	UserCommand* command = findCommand(data->commands, data->commandsTableSize, commandName);
+	const UserCommand* command = hash_find(&data->cmds, commandName);
 
 	if (command != NULL)
 	{
@@ -348,16 +302,22 @@ void secondRun(ProgramData* data,
 	}
 }
 
+boolean strcmp_(const KeyType key, const ObjectType object)
+{
+	return strcmp((const char*)key, ((const UserCommand*)object)->name) == 0;
+}
+
+
 int main(int argc, char** argv)
 {
 	FILE* inputFile;
 	FILE* objectOutFile;
 	ProgramData data = {0};
+	ObjectMetadata meta = { prehashCommand, strcmp_, sizeof(UserCommand) };
 
 	FILE* status = freopen("log", "w", stdout);
-	data.commands = (UserCommand*)calloc(COMMANDS_TABLE_SIZE, sizeof(UserCommand));
-	data.commandsTableSize = COMMANDS_TABLE_SIZE;
 
+	data.cmds = newHashTable(meta);
 	if (status == NULL)
 		puts("Bad redirect");
 
@@ -370,8 +330,8 @@ int main(int argc, char** argv)
 		puts("BAD FILE");
 	}
 
-	insertCommand(data.commands, data.commandsTableSize, &stopCommand);
-	insertCommand(data.commands, data.commandsTableSize, &rtsCommand);
+	hash_insert(&data.cmds, stopCommand.name, &stopCommand);
+	hash_insert(&data.cmds, rtsCommand.name, &rtsCommand);
 
 	firstRun(inputFile, &data);
 
