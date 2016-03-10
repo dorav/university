@@ -11,9 +11,9 @@
 
 #include "types.h"
 #include "hash_table.h"
+#include "utility.h"
+
 #define MAX_LINE_SIZE 100
-#define FALSE 0
-#define TRUE 1
 
 /* Created using isspace function */
 static char space_chars[] = {9, 10, 11, 12, 13, 32};
@@ -34,20 +34,20 @@ typedef struct
 
 LineType defaultLineType()
 {
-	LineType returnValue = { FALSE };
+	LineType returnValue = { False };
 
 	return returnValue;
 }
 
-short isSpaces(const char* line)
+boolean isSpaces(const char* line)
 {
 	while (*line)
-		if (! isspace(*line))
-			return 0;
+		if (!isspace(*line))
+			return False;
 		else
 			++line;
 
-	return 1;
+	return True;
 }
 
 typedef struct
@@ -63,11 +63,11 @@ LineType getLineType(Line* line)
 	LineType returnValue = defaultLineType();
 
 	if (line->data[0] == ';')
-		returnValue.isComment = TRUE;
+		returnValue.isComment = True;
 	else if (isSpaces(line->data))
-		returnValue.isEmptyLine = TRUE;
+		returnValue.isEmptyLine = True;
 	else
-		returnValue.isParsingRequired = TRUE;
+		returnValue.isParsingRequired = True;
 
 	return returnValue;
 }
@@ -122,9 +122,12 @@ void putCommandOpcode(CPUInstruction* dest, CommandOpcode value)
 
 void parseNoArgsCommand(const Line* line, CPUInstruction* instruction, const UserCommand* command)
 {
-	char* argument = strtok(NULL, space_chars);
+	static char argument[MAX_LINE_SIZE];
 
-	if (argument == NULL || isSpaces(argument))
+	token tok = strtok_begin(line->data, space_chars);
+	token argToken = strtok_next_cp(tok, space_chars, argument);
+
+	if (argToken.start == NULL)
 		putCommandOpcode(instruction, command->opcode);
 	else
 	{
@@ -158,21 +161,154 @@ int isEqual(const UserCommand* cmd, const char* name)
 UserCommand rtsCommand = { RtsOpcode, "rts" };
 UserCommand stopCommand = { StopOpcode, "stop" };
 
+#define MAX_LABEL_LENGTH 30
+
+boolean validateLabelName_(Line* line, const char* labelName)
+{
+	int len = 0;
+	/* first char must be a letter */
+	if (!isalpha(*labelName))
+	{
+		printf("At line %d, label name \"%s\", cannot start with a non alphabetic character.\n", line->lineNumber, labelName);
+		return False;
+	}
+
+	++len;
+
+	/* rest of the label name must contain only alpha-numerical characters */
+	while (*(labelName + len) != '\0')
+	{
+		if (!isalnum(*(labelName + len)))
+		{
+			printf("At line %d, label name \"%s\", cannot contain alpha-numeric character.\n", line->lineNumber, labelName);
+			return False;
+		}
+
+		++len;
+	}
+
+	if (len > MAX_LABEL_LENGTH)
+	{
+		printf("At line %d, label name \"%s\", cannot be more then %d chars long.\n", line->lineNumber, labelName, MAX_LABEL_LENGTH);
+		return False;
+	}
+
+	return True;
+}
+static const char labelDelimiters[] = ":";
+
+boolean hasLabel(const char* data)
+{
+	/* This can also be a comment or a string
+	 * But comments are filtered before and strings also have a label. */
+	while (*data != '\0')
+	{
+		if (isDelimiter(*data, labelDelimiters))
+			return True;
+		data++;
+	}
+
+	return False;
+}
+
+const char* validateLabelName(const char* name,	Line* line)
+{
+	static char labelName[MAX_LINE_SIZE];
+	strtok_begin_cp(name, labelDelimiters, labelName);
+	if (validateLabelName_(line, labelName) == False)
+		return NULL;
+
+	return labelName;
+}
+
+/* Returns weather a token is a label.
+ * If it's an invalid label, line parameter will be set to have errors
+ *
+ * This function may change token parameter's internal values
+ *
+ * Return value is the next char after the label token.
+ * Returns NULL if invalid
+ */
+char* parseLabel(Line* line, char* firstToken)
+{
+	token labelToken = strtok_begin(line->data, labelDelimiters);
+	const char* labelDelimiter = labelToken.end + 1;
+	const char* restOfTheLine = labelDelimiter + 1;
+	const char* labelName;
+
+	/* If line starts with spaces and followed by label delimiter */
+	if (isDelimiter(*firstToken, labelDelimiters))
+	{
+		printf("At line %d, missing label name before ':'\n", line->lineNumber);
+		line->hasError = True;
+		return NULL;
+	}
+
+	if ((labelName = validateLabelName(firstToken, line)) == NULL)
+	{
+		line->hasError = True;
+		return NULL;
+	}
+
+	/* Checking if the rest of the line is not empty or only filled with white spaces */
+	if (*restOfTheLine == '\0' || isSpaces(restOfTheLine))
+	{
+		printf("At line %d, after label '%s', line must contain more content\n", line->lineNumber, labelName);
+		line->hasError = True;
+		return NULL;
+	}
+	else if (isDelimiter(*restOfTheLine, labelDelimiters))
+	{
+		printf("At line %d, after label '%s', too many label delimiters ':'\n", line->lineNumber, labelName);
+		line->hasError = True;
+		return NULL;
+	}
+
+	return (char*)strtok_next(labelToken, labelDelimiters).start;
+}
+
+boolean containsLabel(token firstToken)
+{
+	return isDelimiter(*(firstToken.end + 1), labelDelimiters);
+}
+
+void remove_end_line_for_printing(char* str)
+{
+	while (*str != '\n' && *str != '\0')
+		++str;
+
+	*str = '\0';
+}
+
 CPUInstruction parseLine(ProgramData* data, Line* line)
 {
+	static char firstToken[MAX_LINE_SIZE];
+	char* labelLessLine = firstToken;
 	CPUInstruction i = {0};
+	const UserCommand* command;
 
-	char* commandName = strtok(line->data, space_chars);
-	const UserCommand* command = hash_find(&data->cmds, commandName);
+	strtok_begin_cp(line->data, space_chars, firstToken);
 
+	if (hasLabel(firstToken))
+	{
+		/* Using the firstToken and not line data because it is filtered from prefixed spaces */
+		labelLessLine = parseLabel(line, firstToken);
+		if (line->hasError)
+			return i;
+
+		strtok_begin_cp(labelLessLine, space_chars, labelLessLine);
+	}
+
+	command = hash_find(&data->cmds, labelLessLine);
 	if (command != NULL)
 	{
 		parseNoArgsCommand(line, &i, command);
 	}
 	else
 	{
-		printf("line %d: No such command \"%s\"\n", line->lineNumber, commandName);
-		line->hasError = TRUE;
+		remove_end_line_for_printing((char*)labelLessLine);
+		printf("line %d: No such command \"%s\"\n", line->lineNumber, labelLessLine);
+		line->hasError = True;
 	}
 
 	return i;
@@ -255,6 +391,7 @@ void validateInstruction(ProgramData* data, CPUInstruction i)
 
 int getLine(Line* line, FILE* inputFile)
 {
+	line->hasError = False;
 	++(line->lineNumber);
 	return fgets(line->data, MAX_LINE_SIZE, inputFile) == line->data && !feof(inputFile);
 }
@@ -274,10 +411,10 @@ void firstRun(FILE* inputFile,
 	{
 		instruction = getLineType(&line);
 
-		if (shouldIgnoreLine(&instruction) == FALSE)
+		if (shouldIgnoreLine(&instruction) == False)
 		{
 			validateInstruction(data, parseLine(data, &line));
-			if (line.hasError == TRUE)
+			if (line.hasError == True)
 				++(data->numberOfErrors);
 		}
 	}
@@ -294,7 +431,7 @@ void secondRun(ProgramData* data,
 	{
 		instruction = getLineType(&l);
 
-		if (shouldIgnoreLine(&instruction) == FALSE)
+		if (shouldIgnoreLine(&instruction) == False)
 		{
 			printInstruction(objectOutFile, data, parseLine(data, &l));
 			data->instruction_counter += 1;

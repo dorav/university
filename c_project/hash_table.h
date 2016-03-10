@@ -8,13 +8,9 @@
 #ifndef HASH_TABLE_H_
 #define HASH_TABLE_H_
 
-#define DEFAULT_TABLE_SIZE 29
+#include "utility.h"
 
-typedef int boolean;
-#define Equal 1
-#define NotEqual 0
-#define True 1
-#define False 0
+#define DEFAULT_TABLE_SIZE 29
 
 typedef const void* KeyType;
 typedef const void* ObjectType;
@@ -57,7 +53,7 @@ typedef struct
 hash_table newHashTablePreAllocated(ObjectMetadata objectMetadata, void* objects, unsigned int tableSize);
 hash_table newHashTable(ObjectMetadata objectMetadata);
 
-const void* hash_find(hash_table* table, void* key);
+const void* hash_find(hash_table* table, const void* key);
 
 #define FAILURE 0
 #define GOOD 1

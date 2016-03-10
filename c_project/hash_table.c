@@ -10,7 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-table_node hash_find_free(hash_table* table, void* key);
+table_node hash_find_free(hash_table* table, const void* key);
 
 hash_table newHashTablePreAllocated(ObjectMetadata objectMetadata, void* objects, unsigned int tableSize)
 {
@@ -119,7 +119,7 @@ key_hash_iterator begin(hash_table* table, KeyType key)
 	return first;
 }
 
-table_node hash_find_free(hash_table* table, void* key)
+table_node hash_find_free(hash_table* table, const void* key)
 {
 	key_hash_iterator current;
 
@@ -132,7 +132,7 @@ table_node hash_find_free(hash_table* table, void* key)
 	return NullNode;
 }
 
-const void* hash_find(hash_table* table, void* key)
+const void* hash_find(hash_table* table, const void* key)
 {
 	key_hash_iterator current;
 

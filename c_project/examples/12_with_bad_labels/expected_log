@@ -1,0 +1,9 @@
+At line 2, after label 'MAIN', line must contain more content
+At line 5, after label 'MAIN2', too many label delimiters ':'
+At line 6, after label 'MAIN3', too many label delimiters ':'
+At line 9, missing label name before ':'
+At line 12, missing label name before ':'
+At line 15, label name "3Main", cannot start with a non alphabetic character.
+At line 16, label name "4Main", cannot start with a non alphabetic character.
+At line 17, label name "4Main", cannot start with a non alphabetic character.
+At line 20, label name "a234567890123456789012345678901", cannot be more then 30 chars long.
