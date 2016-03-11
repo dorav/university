@@ -23,6 +23,9 @@ typedef struct
 	int lineNumber;
 	char data[MAX_LINE_SIZE];
 	int hasError;
+	const char* commandNameLoc;
+	const char* firstArgumentLoc;
+	const char* secondArgumentLoc;
 } Line;
 
 typedef struct
@@ -120,19 +123,10 @@ void putCommandOpcode(CPUInstruction* dest, CommandOpcode value)
 	dest->bits ^= OPCODE_TO_BINARY(value); /* set only the wanted bits on */
 }
 
-void parseNoArgsCommand(const Line* line, CPUInstruction* instruction, const UserCommand* command)
+CPUInstruction noInstruction()
 {
-	static char argument[MAX_LINE_SIZE];
-
-	token tok = strtok_begin(line->data, space_chars);
-	token argToken = strtok_next_cp(tok, space_chars, argument);
-
-	if (argToken.start == NULL)
-		putCommandOpcode(instruction, command->opcode);
-	else
-	{
-		printf("line %d: invalid arguments after \"%s\". Expected '0' arguments.\n", line->lineNumber, command->name);
-	}
+	CPUInstruction i = { 0 };
+	return i;
 }
 
 /* Internal function for calculating a given command's hash code.
@@ -221,18 +215,14 @@ const char* validateLabelName(const char* name,	Line* line)
 	return labelName;
 }
 
-/* Returns weather a token is a label.
- * If it's an invalid label, line parameter will be set to have errors
+/* Validates and register the label in the symbol table.
  *
- * This function may change token parameter's internal values
- *
- * Return value is the next char after the label token.
- * Returns NULL if invalid
+ * Returns a pointer to the next token in the line
  */
 char* parseLabel(Line* line, char* firstToken)
 {
 	token labelToken = strtok_begin(line->data, labelDelimiters);
-	const char* labelDelimiter = labelToken.end + 1;
+	const char* labelDelimiter = labelToken.end + 1; /* Not '\0' because label exists */
 	const char* restOfTheLine = labelDelimiter + 1;
 	const char* labelName;
 
@@ -272,46 +262,59 @@ boolean containsLabel(token firstToken)
 	return isDelimiter(*(firstToken.end + 1), labelDelimiters);
 }
 
-void remove_end_line_for_printing(char* str)
+CPUInstruction parseNoArgsCommand(Line* line, const UserCommand* command)
 {
-	while (*str != '\n' && *str != '\0')
-		++str;
+	CPUInstruction instruction = noInstruction();
 
-	*str = '\0';
+	if (line->firstArgumentLoc == NULL)
+		putCommandOpcode(&instruction, command->opcode);
+	else
+	{
+		printf("line %d: invalid arguments after \"%s\". Expected '0' arguments.\n", line->lineNumber, command->name);
+		line->hasError = True;
+	}
+
+	return instruction;
+}
+
+CPUInstruction handleCommand(ProgramData* data, Line* line, const char* commandNameString)
+{
+	const UserCommand* command;
+
+	command = hash_find(&data->cmds, commandNameString);
+	if (command != NULL)
+		return parseNoArgsCommand(line, command);
+
+	printf("line %d: No such command \"%s\"\n", line->lineNumber, commandNameString);
+	line->hasError = True;
+
+	return noInstruction();
 }
 
 CPUInstruction parseLine(ProgramData* data, Line* line)
 {
-	static char firstToken[MAX_LINE_SIZE];
-	char* labelLessLine = firstToken;
+	static char commandNameString[MAX_LINE_SIZE];
+	char* restOfTheLine;
 	CPUInstruction i = {0};
-	const UserCommand* command;
 
-	strtok_begin_cp(line->data, space_chars, firstToken);
+	token cmdNameTok = strtok_begin_cp(line->data, space_chars, commandNameString);
 
-	if (hasLabel(firstToken))
+	if (hasLabel(commandNameString))
 	{
 		/* Using the firstToken and not line data because it is filtered from prefixed spaces */
-		labelLessLine = parseLabel(line, firstToken);
+		restOfTheLine = parseLabel(line, commandNameString);
 		if (line->hasError)
 			return i;
 
-		strtok_begin_cp(labelLessLine, space_chars, labelLessLine);
+		/* We need the command name with a null terminator.
+		 * This also returns the command's first argument ptr, so we place it in line */
+		cmdNameTok = strtok_begin_cp(restOfTheLine, space_chars, commandNameString);
 	}
 
-	command = hash_find(&data->cmds, labelLessLine);
-	if (command != NULL)
-	{
-		parseNoArgsCommand(line, &i, command);
-	}
-	else
-	{
-		remove_end_line_for_printing((char*)labelLessLine);
-		printf("line %d: No such command \"%s\"\n", line->lineNumber, labelLessLine);
-		line->hasError = True;
-	}
+	line->commandNameLoc = cmdNameTok.start;
+	line->firstArgumentLoc = strtok_next(cmdNameTok, space_chars).start;
 
-	return i;
+	return handleCommand(data, line, commandNameString);
 }
 
 char to_32bit(unsigned int value)
