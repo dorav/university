@@ -13,28 +13,8 @@
 #include "hash_table.h"
 #include "utility.h"
 
-#define MAX_LINE_SIZE 100
-
 /* Created using isspace function */
 static char space_chars[] = {9, 10, 11, 12, 13, 32};
-
-typedef struct
-{
-	int lineNumber;
-	char data[MAX_LINE_SIZE];
-	int hasError;
-	const char* commandNameLoc;
-	const char* firstArgumentLoc;
-	const char* secondArgumentLoc;
-	const char* thirdArgumentLoc;
-} Line;
-
-typedef struct
-{
-	int isEmptyLine;
-	int isComment;
-	int isParsingRequired;
-} LineType;
 
 LineType defaultLineType()
 {
@@ -56,10 +36,12 @@ boolean isSpaces(const char* line)
 
 typedef struct
 {
+	boolean doneWithFirstRun;
 	unsigned int instruction_counter;
 	unsigned int data_counter;
 	unsigned int numberOfErrors;
-	hash_table cmds;
+	OHashTable cmds;
+	LHashTable symbols;
 } ProgramData;
 
 LineType getLineType(Line* line)
@@ -143,6 +125,14 @@ unsigned int prehashCommand(ObjectType command)
 	return ((const char*) command)[0] - 'a';
 }
 
+#define UNUSED(thing) (void)thing
+
+unsigned int stupidhash(ObjectType command)
+{
+	UNUSED(command);
+	return 0;
+}
+
 #define Equal 1
 #define NotEqual 0
 
@@ -158,7 +148,7 @@ UserCommand stopCommand = { StopOpcode, "stop" };
 
 #define MAX_LABEL_LENGTH 30
 
-boolean validateLabelName_(Line* line, const char* labelName)
+boolean validateLabelName_(ProgramData* data, Line* line, const char* labelName)
 {
 	int len = 0;
 	/* first char must be a letter */
@@ -188,6 +178,12 @@ boolean validateLabelName_(Line* line, const char* labelName)
 		return False;
 	}
 
+	if (ohash_find(&data->cmds, labelName) != NULL)
+	{
+		printf("At line %d, label name \"%s\", is an instruction keyword, choose a different name.\n", line->lineNumber, labelName);
+		return False;
+	}
+
 	return True;
 }
 static const char labelDelimiters[] = ":";
@@ -206,21 +202,43 @@ boolean hasLabel(const char* data)
 	return False;
 }
 
-const char* validateLabelName(const char* name,	Line* line)
+const char* validateLabelName(ProgramData* data, const char* name,	Line* line)
 {
 	static char labelName[MAX_LINE_SIZE];
 	strtok_begin_cp(name, labelDelimiters, labelName);
-	if (validateLabelName_(line, labelName) == False)
+	if (validateLabelName_(data, line, labelName) == False)
 		return NULL;
 
 	return labelName;
+}
+
+void insertLabel(ProgramData* data, const char* labelName, Line* line)
+{
+	Symbol* s = calloc(sizeof(Symbol), 1);
+
+	s->lineNumber = line->lineNumber;
+	strcpy(s->name, labelName);
+
+	lhash_insert(&data->symbols, labelName, s);
+}
+
+void registerSymbol(ProgramData* data, const char* labelName, Line* line)
+{
+	const Symbol* s = lhash_find(&data->symbols, labelName);
+	if (s == NULL)
+		insertLabel(data, labelName, line);
+	else
+	{
+		printf("At line %d, invalid label definition '%s', collision with label defined at line %d\n", line->lineNumber, labelName, s->lineNumber);
+		line->hasError = True;
+	}
 }
 
 /* Validates and register the label in the symbol table.
  *
  * Returns a pointer to the next token in the line
  */
-char* parseLabel(Line* line, char* firstToken)
+char* parseLabel(ProgramData* data, Line* line, char* firstToken)
 {
 	token labelToken = strtok_begin(line->data, labelDelimiters);
 	const char* labelDelimiter = labelToken.end + 1; /* Not '\0' because label exists */
@@ -235,7 +253,7 @@ char* parseLabel(Line* line, char* firstToken)
 		return NULL;
 	}
 
-	if ((labelName = validateLabelName(firstToken, line)) == NULL)
+	if ((labelName = validateLabelName(data, firstToken, line)) == NULL)
 	{
 		line->hasError = True;
 		return NULL;
@@ -254,6 +272,9 @@ char* parseLabel(Line* line, char* firstToken)
 		line->hasError = True;
 		return NULL;
 	}
+
+	if (!data->doneWithFirstRun)
+		registerSymbol(data, labelName, line);
 
 	return (char*)strtok_next(labelToken, labelDelimiters).start;
 }
@@ -282,7 +303,7 @@ CPUInstruction handleCommand(ProgramData* data, Line* line, const char* commandN
 {
 	const UserCommand* command;
 
-	command = hash_find(&data->cmds, commandNameString);
+	command = ohash_find(&data->cmds, commandNameString);
 	if (command != NULL)
 		return parseNoArgsCommand(line, command);
 
@@ -317,7 +338,7 @@ CPUInstruction parseLine(ProgramData* data, Line* line)
 	if (hasLabel(commandNameString))
 	{
 		/* Using the firstToken and not line data because it is filtered from prefixed spaces */
-		restOfTheLine = parseLabel(line, commandNameString);
+		restOfTheLine = parseLabel(data, line, commandNameString);
 		if (line->hasError)
 			return i;
 
@@ -423,6 +444,7 @@ void firstRun(FILE* inputFile,
 	Line line = { 0 };
 	LineType instruction;
 
+	data->doneWithFirstRun = False;
 	while (getLine(&line, inputFile))
 	{
 		instruction = getLineType(&line);
@@ -434,6 +456,7 @@ void firstRun(FILE* inputFile,
 				++(data->numberOfErrors);
 		}
 	}
+	data->doneWithFirstRun = True;
 }
 
 void secondRun(ProgramData* data,
@@ -455,36 +478,50 @@ void secondRun(ProgramData* data,
 	}
 }
 
-boolean strcmp_(const KeyType key, const ObjectType object)
+boolean commandNameCmd(const KeyType key, const ObjectType object)
 {
 	return strcmp((const char*)key, ((const UserCommand*)object)->name) == 0;
 }
 
+void initCommandsTable(ProgramData* data)
+{
+	ObjectMetadata meta = { prehashCommand, commandNameCmd, sizeof(UserCommand) };
+
+	data->cmds = newOHashTable(meta);
+	ohash_insert(&data->cmds, stopCommand.name, &stopCommand);
+	ohash_insert(&data->cmds, rtsCommand.name, &rtsCommand);
+}
+
+boolean symbolNameCmd(const KeyType key, const ObjectType object)
+{
+	return strcmp((const char*)key, ((const Symbol*)object)->name) == 0;
+}
+
+void initSymbolsTable(ProgramData* data)
+{
+	ObjectMetadata meta = { stupidhash, symbolNameCmd, sizeof(Symbol) };
+
+	data->symbols = newLHashTable(meta, 1);
+}
 
 int main(int argc, char** argv)
 {
 	FILE* inputFile;
 	FILE* objectOutFile;
 	ProgramData data = {0};
-	ObjectMetadata meta = { prehashCommand, strcmp_, sizeof(UserCommand) };
 
 	FILE* status = freopen("log", "w", stdout);
-
-	data.cmds = newHashTable(meta);
 	if (status == NULL)
 		puts("Bad redirect");
 
+	inputFile = getInputfile(argv[FILE_NAME_ARG_INDEX]);
+	if (inputFile == NULL)
+		puts("BAD FILE");
+
 	validateNumberOfArguments(argc, argv);
 
-	inputFile = getInputfile(argv[FILE_NAME_ARG_INDEX]);
-
-	if (inputFile == NULL)
-	{
-		puts("BAD FILE");
-	}
-
-	hash_insert(&data.cmds, stopCommand.name, &stopCommand);
-	hash_insert(&data.cmds, rtsCommand.name, &rtsCommand);
+	initCommandsTable(&data);
+	initSymbolsTable(&data);
 
 	firstRun(inputFile, &data);
 

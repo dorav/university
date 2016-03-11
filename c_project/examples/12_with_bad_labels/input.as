@@ -30,7 +30,7 @@ MAIN: rts
 main: rts
 
 ; Label can't be keywords or registers
-mov: rts
+stop: rts
 r1: rts
 
 ; Not supporting two labels at the same line
