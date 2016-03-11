@@ -26,6 +26,7 @@ typedef struct
 	const char* commandNameLoc;
 	const char* firstArgumentLoc;
 	const char* secondArgumentLoc;
+	const char* thirdArgumentLoc;
 } Line;
 
 typedef struct
@@ -291,6 +292,20 @@ CPUInstruction handleCommand(ProgramData* data, Line* line, const char* commandN
 	return noInstruction();
 }
 
+void extractArgsLocations(Line* line, token token)
+{
+	line->commandNameLoc = token.start;
+
+	token = strtok_next(token, space_chars);
+	line->firstArgumentLoc = token.start;
+
+	token = strtok_next(token, space_chars);
+	line->secondArgumentLoc = token.start;
+
+	token = strtok_next(token, space_chars);
+	line->thirdArgumentLoc = token.start;
+}
+
 CPUInstruction parseLine(ProgramData* data, Line* line)
 {
 	static char commandNameString[MAX_LINE_SIZE];
@@ -311,9 +326,7 @@ CPUInstruction parseLine(ProgramData* data, Line* line)
 		cmdNameTok = strtok_begin_cp(restOfTheLine, space_chars, commandNameString);
 	}
 
-	line->commandNameLoc = cmdNameTok.start;
-	line->firstArgumentLoc = strtok_next(cmdNameTok, space_chars).start;
-
+	extractArgsLocations(line, cmdNameTok);
 	return handleCommand(data, line, commandNameString);
 }
 
