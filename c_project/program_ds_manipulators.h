@@ -11,6 +11,7 @@
 #include "types.h"
 
 void insertEntry(ProgramData* data, const char* labelName, Line* line);
+void insertExtern(ProgramData* data, const char* labelName, Line* line);
 void insertLabel(ProgramData* data, const char* labelName, Line* line);
 void registerSymbol(ProgramData* data, const char* labelName, Line* line);
 

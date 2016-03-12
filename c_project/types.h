@@ -73,6 +73,7 @@ typedef struct
 	char name[LABEL_MAX_LEN];
 	unsigned int lineNumber;
 	unsigned int referencedMemAddr;
+	boolean isExternal;
 } Symbol;
 
 typedef struct

@@ -1,0 +1,3 @@
+At line 12, invalid label definition 'LABEL', collision with label defined at line 1
+At line 5, expected label 'MAIN' cannot be an external reference from line 4.
+At line 7, expected label 'NOPE', to be defined somewhere. Label never found.

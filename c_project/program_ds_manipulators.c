@@ -48,6 +48,13 @@ void insertEntry(ProgramData* data, const char* labelName, Line* line)
 	lhash_insert(&data->entries, labelName, newSymbol(labelName, line));
 }
 
+void insertExtern(ProgramData* data, const char* labelName, Line* line)
+{
+	Symbol* s = newSymbol(labelName, line);
+	s->isExternal = True;
+	lhash_insert(&data->symbols, labelName, s);
+}
+
 void insertLabel(ProgramData* data, const char* labelName, Line* line)
 {
 	lhash_insert(&data->symbols, labelName, newSymbol(labelName, line));

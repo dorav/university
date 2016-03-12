@@ -3,6 +3,7 @@
 .entry MAIN_ 123
 
 .entry NOPE
+.entry
 
 rts
 LABEL:stop

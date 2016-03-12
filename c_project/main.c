@@ -193,12 +193,12 @@ void validateEntries(ProgramData* data)
 					entry->lineNumber, entry->name);
 			data->numberOfErrors++;
 		}
-		/*else if (referencedLabel->isExternal)
+		else if (referencedLabel->isExternal)
 		{
 			printf("At line %d, expected label '%s' cannot be an external reference from line %d.\n",
 					entry->lineNumber, entry->name, referencedLabel->lineNumber);
 			data->numberOfErrors++;
-		}*/
+		}
 	}
 }
 
