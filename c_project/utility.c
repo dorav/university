@@ -103,6 +103,10 @@ token strtok_next(token prev, const char* delimiters)
 {
 	if (prev.start == NULL)
 		return prev;
+
+	if (*prev.end == '\0')
+		return end_token();
+
 	return token_start(prev.end + 1, delimiters);
 }
 

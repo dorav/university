@@ -47,6 +47,24 @@ typedef OHashTable LHashTable;
 
 LHashTable newLHashTable(ObjectMetadata objectMetadata, int tableSize);
 boolean lhash_insert(LHashTable* table, const void* key, void* object);
-const void* lhash_find(LHashTable* table, const void* key);
+void* lhash_find(LHashTable* table, const void* key);
+
+struct LTableNode
+{
+	struct LTableNode* next;
+	void* data;
+};
+
+typedef struct
+{
+	unsigned int index;
+	boolean isValid;
+	struct LTableNode* current;
+	LHashTable* table;
+} lhash_iter;
+
+lhash_iter lhash_begin(LHashTable* table);
+lhash_iter lhash_end();
+void lhash_set_next(lhash_iter* current);
 
 #endif /* HASH_TABLE_H_ */

@@ -1,0 +1,5 @@
+At line 1, label name "2MAIN", cannot start with a non alphabetic character.
+At line 2, label name "MAIN_", cannot contain alpha-numeric character.
+At line 3, label name "MAIN_", cannot contain alpha-numeric character.
+At line 3, unexpected more then one argument 'MAIN_', entry instruction takes one argument.
+At line 5, expected label 'NOPE', to be defined somewhere. Label never found.

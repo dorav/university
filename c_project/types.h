@@ -8,30 +8,33 @@
 #ifndef TYPES_H_
 #define TYPES_H_
 
+#include "hash_table.h"
+
 typedef enum
 {
+	NoOpcode = -1,
 	RtsOpcode = 14,
 	StopOpcode = 15
 } CommandOpcode;
 
 typedef struct
 {
-	unsigned int bits;
-} CPUInstruction;
-
-typedef struct
-{
-	CommandOpcode opcode;
-	char name[5];
-} UserCommand;
+	unsigned int instructionBits;
+	unsigned int instructionSize;
+	unsigned int dataSize;
+	char* data;
+} UserCommandResult;
 
 #define MAX_LINE_SIZE 100
+#define LABEL_MAX_LEN 30
 
 typedef struct
 {
 	int lineNumber;
-	char data[MAX_LINE_SIZE];
 	int hasError;
+	boolean hasLabel;
+	char data[MAX_LINE_SIZE];
+	char labelName[LABEL_MAX_LEN];
 	const char* commandNameLoc;
 	const char* firstArgumentLoc;
 	const char* secondArgumentLoc;
@@ -40,16 +43,34 @@ typedef struct
 
 typedef struct
 {
-	int isEmptyLine;
-	int isComment;
-	int isParsingRequired;
-} LineType;
+	boolean inFirstRun;
+	unsigned int instruction_counter;
+	unsigned int data_counter;
+	unsigned int numberOfErrors;
+	OHashTable cmds;
+	LHashTable symbols;
+	LHashTable registers;
+	LHashTable entries;
+} ProgramData;
 
+struct UserCommand;
+
+typedef UserCommandResult (*CommandHandler)(Line*, const struct UserCommand*, ProgramData* data);
+
+struct UserCommand
+{
+	CommandOpcode opcode;
+	CommandHandler handler;
+	char name[10];
+};
+
+typedef struct UserCommand UserCommand;
 
 typedef struct
 {
-	char name[30];
+	char name[LABEL_MAX_LEN];
 	unsigned int lineNumber;
+	unsigned int referencedMemAddr;
 } Symbol;
 
 typedef struct

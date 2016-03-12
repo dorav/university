@@ -16,13 +16,6 @@
 /* Created using isspace function */
 static char space_chars[] = {9, 10, 11, 12, 13, 32};
 
-LineType defaultLineType()
-{
-	LineType returnValue = { False };
-
-	return returnValue;
-}
-
 boolean isSpaces(const char* line)
 {
 	while (*line)
@@ -34,29 +27,15 @@ boolean isSpaces(const char* line)
 	return True;
 }
 
-typedef struct
+boolean shouldParse(Line* line)
 {
-	boolean doneWithFirstRun;
-	unsigned int instruction_counter;
-	unsigned int data_counter;
-	unsigned int numberOfErrors;
-	OHashTable cmds;
-	LHashTable symbols;
-	LHashTable registers;
-} ProgramData;
-
-LineType getLineType(Line* line)
-{
-	LineType returnValue = defaultLineType();
-
+	/* Could be combined to a single if, but it's easier to debug this */
 	if (line->data[0] == ';')
-		returnValue.isComment = True;
+		return False;
 	else if (isSpaces(line->data))
-		returnValue.isEmptyLine = True;
-	else
-		returnValue.isParsingRequired = True;
+		return False;
 
-	return returnValue;
+	return True;
 }
 
 #define NO_ARGUMENTS_ERROR 1
@@ -101,15 +80,15 @@ FILE* getObjectOutFile()
  * Compile time calculation is needed in c90 for {} initialization of structs */
 #define OPCODE_TO_BINARY(opcode) ((opcode << OPCODE_LOCATION) & OPCODE_MASK)
 
-void putCommandOpcode(CPUInstruction* dest, CommandOpcode value)
+void putCommandOpcode(UserCommandResult* dest, CommandOpcode value)
 {
-	dest->bits &= (!OPCODE_MASK); /* set all opcode bits off */
-	dest->bits ^= OPCODE_TO_BINARY(value); /* set only the wanted bits on */
+	dest->instructionBits &= (!OPCODE_MASK); /* set all opcode bits off */
+	dest->instructionBits ^= OPCODE_TO_BINARY(value); /* set only the wanted bits on */
 }
 
-CPUInstruction noInstruction()
+UserCommandResult nullInstruction()
 {
-	CPUInstruction i = { 0 };
+	UserCommandResult i = { 0 };
 	return i;
 }
 
@@ -143,9 +122,6 @@ int isEqual(const UserCommand* cmd, const char* name)
 }
 
 #define NotFound ""
-
-UserCommand rtsCommand = { RtsOpcode, "rts" };
-UserCommand stopCommand = { StopOpcode, "stop" };
 
 #define MAX_LABEL_LENGTH 30
 
@@ -219,14 +195,24 @@ const char* validateLabelName(ProgramData* data, const char* name,	Line* line)
 	return labelName;
 }
 
-void insertLabel(ProgramData* data, const char* labelName, Line* line)
+Symbol* newSymbol(const char* labelName, Line* line)
 {
 	Symbol* s = calloc(sizeof(Symbol), 1);
 
 	s->lineNumber = line->lineNumber;
 	strcpy(s->name, labelName);
 
-	lhash_insert(&data->symbols, labelName, s);
+	return s;
+}
+
+void insertEntry(ProgramData* data, const char* labelName, Line* line)
+{
+	lhash_insert(&data->entries, labelName, newSymbol(labelName, line));
+}
+
+void insertLabel(ProgramData* data, const char* labelName, Line* line)
+{
+	lhash_insert(&data->symbols, labelName, newSymbol(labelName, line));
 }
 
 void registerSymbol(ProgramData* data, const char* labelName, Line* line)
@@ -280,8 +266,11 @@ char* parseLabel(ProgramData* data, Line* line, char* firstToken)
 		return NULL;
 	}
 
-	if (!data->doneWithFirstRun)
+	if (data->inFirstRun)
 		registerSymbol(data, labelName, line);
+
+	line->hasLabel = True;
+	strcpy(line->labelName, labelName);
 
 	return (char*)strtok_next(labelToken, labelDelimiters).start;
 }
@@ -291,36 +280,89 @@ boolean containsLabel(token firstToken)
 	return isDelimiter(*(firstToken.end + 1), labelDelimiters);
 }
 
-CPUInstruction parseNoArgsCommand(Line* line, const UserCommand* command)
+UserCommandResult parseNoArgsCommand(Line* line, const UserCommand* command, ProgramData* data)
 {
-	CPUInstruction instruction = noInstruction();
+	UserCommandResult result = nullInstruction();
+	UNUSED(data);
 
 	if (line->firstArgumentLoc == NULL)
-		putCommandOpcode(&instruction, command->opcode);
+	{
+		putCommandOpcode(&result, command->opcode);
+		result.instructionSize = 1;
+	}
 	else
 	{
 		printf("line %d: invalid arguments after \"%s\". Expected '0' arguments.\n", line->lineNumber, command->name);
 		line->hasError = True;
 	}
 
-	return instruction;
+	return result;
 }
 
-CPUInstruction handleCommand(ProgramData* data, Line* line, const char* commandNameString)
+UserCommandResult parseEntryCommand(Line* line, const UserCommand* command, ProgramData* data)
+{
+	static char referencedLabel[LABEL_MAX_LEN];
+	UserCommandResult result = nullInstruction();
+	const Symbol* existing;
+
+	if (line->firstArgumentLoc != NULL)
+	{
+		strtok_begin_cp(line->firstArgumentLoc, space_chars, referencedLabel);
+		existing = lhash_find(&data->entries, referencedLabel);
+		/* new entry */
+		if (existing == NULL)
+		{
+			if (validateLabelName_(data, line, referencedLabel))
+				insertEntry(data, referencedLabel, line);
+			else
+				/* Invalid entry */
+				line->hasError = True;
+		}
+		else if (data->inFirstRun)/* entry exists */
+		{
+			printf("At line %d, entry '%s' defined twice, previous definition at %d.", line->lineNumber, referencedLabel, existing->lineNumber);
+			line->hasError = True;
+		}
+
+		if (line->secondArgumentLoc != NULL)
+		{
+			printf("At line %d, unexpected more then one argument '%s', entry instruction takes one argument.\n",
+					line->lineNumber, referencedLabel);
+			line->hasError = True;
+		}
+	}
+	else
+	{
+		printf("line %d: invalid arguments after \"%s\". Expected '0' arguments.\n", line->lineNumber, command->name);
+		line->hasError = True;
+	}
+
+	return result;
+}
+
+UserCommandResult parseExternCommand(Line* line, const UserCommand* command, ProgramData* data)
+{
+	UNUSED(line);
+	UNUSED(data);
+	UNUSED(command);
+	return nullInstruction();
+}
+
+UserCommandResult handleCommand(ProgramData* data, Line* line, const char* commandNameString)
 {
 	const UserCommand* command;
 
 	command = ohash_find(&data->cmds, commandNameString);
 	if (command != NULL)
-		return parseNoArgsCommand(line, command);
+		return command->handler(line, command, data);
 
 	printf("line %d: No such command \"%s\"\n", line->lineNumber, commandNameString);
 	line->hasError = True;
 
-	return noInstruction();
+	return nullInstruction();
 }
 
-void extractArgsLocations(Line* line, token token)
+void interpolateParsedData(Line* line, token token)
 {
 	line->commandNameLoc = token.start;
 
@@ -334,11 +376,11 @@ void extractArgsLocations(Line* line, token token)
 	line->thirdArgumentLoc = token.start;
 }
 
-CPUInstruction parseLine(ProgramData* data, Line* line)
+UserCommandResult parseLine(ProgramData* data, Line* line)
 {
 	static char commandNameString[MAX_LINE_SIZE];
 	char* restOfTheLine;
-	CPUInstruction i = {0};
+	UserCommandResult i = {0};
 
 	token cmdNameTok = strtok_begin_cp(line->data, space_chars, commandNameString);
 
@@ -354,7 +396,7 @@ CPUInstruction parseLine(ProgramData* data, Line* line)
 		cmdNameTok = strtok_begin_cp(restOfTheLine, space_chars, commandNameString);
 	}
 
-	extractArgsLocations(line, cmdNameTok);
+	interpolateParsedData(line, cmdNameTok);
 	return handleCommand(data, line, commandNameString);
 }
 
@@ -405,13 +447,16 @@ void to_32base(unsigned int value, char* buffer)
 	to_32basePadded(value, buffer, 0);
 }
 
-void printInstruction(FILE* f, const ProgramData* data, CPUInstruction i)
+void printInstruction(FILE* f, const ProgramData* data, UserCommandResult i)
 {
 	static char instruction32base[10];
 	static char instructionCounter32base[10];
 
+	if (i.instructionSize == 0)
+		return;
+
 	to_32basePadded(data->instruction_counter, instructionCounter32base, 3);
-	to_32basePadded(i.bits, instruction32base, 3);
+	to_32basePadded(i.instructionBits, instruction32base, 3);
 
 	fprintf(f, "%s %s\n", instructionCounter32base, instruction32base);
 }
@@ -427,60 +472,57 @@ void printCounterHeader(FILE* f, const ProgramData* data)
 	fprintf(f, "%s %s\n", instructionCounter32base, dataCounter2base);
 }
 
-void validateInstruction(ProgramData* data, CPUInstruction i)
-{
-	++(data->instruction_counter);
-	(void)i;
-}
-
 int getLine(Line* line, FILE* inputFile)
 {
-	line->hasError = False;
-	++(line->lineNumber);
+	Line newLine = { 0 };
+	newLine.lineNumber = line->lineNumber + 1;
+	*line = newLine;
 	return fgets(line->data, MAX_LINE_SIZE, inputFile) == line->data && !feof(inputFile);
-}
-
-int shouldIgnoreLine(const LineType* instruction)
-{
-	return instruction->isEmptyLine || instruction->isComment;
 }
 
 void firstRun(FILE* inputFile,
 			  ProgramData* data)
 {
+	UserCommandResult parsedLine;
 	Line line = { 0 };
-	LineType instruction;
 
-	data->doneWithFirstRun = False;
+	data->inFirstRun = True;
 	while (getLine(&line, inputFile))
 	{
-		instruction = getLineType(&line);
-
-		if (shouldIgnoreLine(&instruction) == False)
+		if (shouldParse(&line))
 		{
-			validateInstruction(data, parseLine(data, &line));
+			parsedLine = parseLine(data, &line);
 			if (line.hasError == True)
 				++(data->numberOfErrors);
+
+			data->instruction_counter += parsedLine.instructionSize;
 		}
 	}
-	data->doneWithFirstRun = True;
+	data->inFirstRun = False;
 }
 
 void secondRun(ProgramData* data,
 			   FILE* inputFile,
 			   FILE* objectOutFile)
 {
-	LineType instruction;
-	Line l = { 0 };
+	UserCommandResult parsed;
+	Symbol* lineLabel;
+	Line line = { 0 };
 
-	while (getLine(&l, inputFile))
+	while (getLine(&line, inputFile))
 	{
-		instruction = getLineType(&l);
-
-		if (shouldIgnoreLine(&instruction) == False)
+		if (shouldParse(&line))
 		{
-			printInstruction(objectOutFile, data, parseLine(data, &l));
-			data->instruction_counter += 1;
+			parsed = parseLine(data, &line);
+			printInstruction(objectOutFile, data, parsed);
+
+			if (line.hasLabel)
+			{
+				lineLabel = (Symbol*)lhash_find(&data->symbols, line.labelName);
+				lineLabel->referencedMemAddr += data->instruction_counter;
+			}
+
+			data->instruction_counter += parsed.instructionSize;
 		}
 	}
 }
@@ -492,11 +534,18 @@ boolean commandNameCmp(const KeyType key, const ObjectType object)
 
 void initCommandsTable(ProgramData* data)
 {
+	static UserCommand rtsCommand = { RtsOpcode, parseNoArgsCommand, "rts" };
+	static UserCommand stopCommand = { StopOpcode, parseNoArgsCommand,  "stop" };
+	static UserCommand entryCommand = { NoOpcode, parseEntryCommand, ".entry" };
+	static UserCommand externCommand = { NoOpcode, parseExternCommand, ".extern" };
+
 	ObjectMetadata meta = { prehashCommand, commandNameCmp, sizeof(UserCommand) };
 
 	data->cmds = newOHashTable(meta);
 	ohash_insert(&data->cmds, stopCommand.name, &stopCommand);
 	ohash_insert(&data->cmds, rtsCommand.name, &rtsCommand);
+	ohash_insert(&data->cmds, entryCommand.name, &entryCommand);
+	ohash_insert(&data->cmds, externCommand.name, &externCommand);
 }
 
 boolean symbolNameCmp(const KeyType key, const ObjectType object)
@@ -567,6 +616,93 @@ void initRegisters(ProgramData* data)
 
 }
 
+void initEntries(ProgramData* data)
+{
+	ObjectMetadata meta = { stupidhash, registerNameCmp, sizeof(Register) };
+
+	data->entries = newLHashTable(meta, 1);
+}
+
+#define ENTRY_FILE_EXT ".ent"
+/* For both linux and windows */
+#define DIRECTORY_DELIMITERS "/\\"
+
+char* getFileNameWithExt(const char* inputFileName, const char* ext)
+{
+	int outputFileNameLen = strlen(inputFileName) + strlen(ext) + 1;
+	char* outputFileName = calloc(1, outputFileNameLen);
+
+	token t = strtok_begin_cp(inputFileName, DIRECTORY_DELIMITERS, outputFileName);
+	while (strtok_next(t, DIRECTORY_DELIMITERS).start != NULL)
+		t = strtok_next_cp(t, DIRECTORY_DELIMITERS, outputFileName);
+
+	strcat(outputFileName, ext);
+
+	return outputFileName;
+}
+
+FILE* getEntriesOutFile(const char* inputFileName)
+{
+	char* outputFileName = getFileNameWithExt(inputFileName, ENTRY_FILE_EXT);
+	FILE* file;
+
+	file = fopen(outputFileName, "w");
+
+	if (file == NULL)
+	{
+		puts("BAD OUTPUT FILE");
+	}
+
+	free (outputFileName);
+
+	return file;
+}
+
+void validateEntries(ProgramData* data)
+{
+	lhash_iter i;
+	Symbol* entry;
+	Symbol* referencedLabel;
+
+	for (i = lhash_begin(&data->entries); i.isValid; lhash_set_next(&i))
+	{
+		entry = (Symbol*) i.current->data;
+		referencedLabel  = lhash_find(&data->symbols, entry->name);
+		if (referencedLabel == NULL)
+		{
+			printf("At line %d, expected label '%s', to be defined somewhere. Label never found.\n",
+					entry->lineNumber, entry->name);
+			data->numberOfErrors++;
+		}
+		/*else if (referencedLabel->isExternal)
+		{
+			printf("At line %d, expected label '%s' cannot be an external reference from line %d.\n",
+					entry->lineNumber, entry->name, referencedLabel->lineNumber);
+			data->numberOfErrors++;
+		}*/
+	}
+}
+
+void writeEntriesFile(ProgramData* data, const char* inputFileName)
+{
+	static char addr32base[10];
+
+	FILE* entriesFile = getEntriesOutFile(inputFileName);
+	lhash_iter i;
+	Symbol* entry;
+	Symbol* referencedLabel;
+
+	for (i = lhash_begin(&data->entries); i.isValid; lhash_set_next(&i))
+	{
+		entry = (Symbol*) i.current->data;
+		referencedLabel = lhash_find(&data->symbols, entry->name);
+		to_32base(referencedLabel->referencedMemAddr, addr32base);
+		fprintf(entriesFile, "%s %s\n", referencedLabel->name, addr32base);
+	}
+
+	fclose(entriesFile);
+}
+
 int main(int argc, char** argv)
 {
 	FILE* inputFile;
@@ -586,12 +722,15 @@ int main(int argc, char** argv)
 	initCommandsTable(&data);
 	initSymbolsTable(&data);
 	initRegisters(&data);
+	initEntries(&data);
 
 	firstRun(inputFile, &data);
 
 	fclose(inputFile);
-	inputFile = getInputfile(argv[FILE_NAME_ARG_INDEX]);
 
+	validateEntries(&data);
+
+	inputFile = getInputfile(argv[FILE_NAME_ARG_INDEX]);
 
 	if (data.numberOfErrors == 0)
 	{
@@ -607,6 +746,9 @@ int main(int argc, char** argv)
 
 		secondRun(&data, inputFile, objectOutFile);
 		fclose(objectOutFile);
+
+		if (data.entries.numberOfUsed > 0)
+			writeEntriesFile(&data, argv[FILE_NAME_ARG_INDEX]);
 	}
 
 	fclose(status);

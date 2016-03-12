@@ -159,12 +159,6 @@ const void* ohash_find(OHashTable* table, const void* key)
 	return NullNode.obj;
 }
 
-struct LTableNode
-{
-	struct LTableNode* next;
-	void* data;
-};
-
 LHashTable newLHashTable(ObjectMetadata objectMetadata, int tableSize)
 {
 	LHashTable table;
@@ -201,11 +195,11 @@ boolean lhash_insert(LHashTable* table, const void* key, void* object)
 		bucket->next->data = object;
 		bucket->next->next = NULL;
 	}
-
+	table->numberOfUsed++;
 	return GOOD;
 }
 
-const void* lhash_find(LHashTable* table, const void* key)
+void* lhash_find(LHashTable* table, const void* key)
 {
 	int prehash = table->metadata.preHash(key) % table->tableSize;
 	struct LTableNode* bucket = &((struct LTableNode*)table->objects)[prehash];
@@ -218,4 +212,42 @@ const void* lhash_find(LHashTable* table, const void* key)
 	}
 
 	return NULL;
+}
+
+void find_next_bucket(lhash_iter* i, unsigned int start)
+{
+	for (i->index = start; i->index < i->table->tableSize; ++i->index)
+	{
+		i->current = &((struct LTableNode*)i->table->objects)[i->index];
+		if (i->current->data != NULL)
+			break;
+	}
+
+	if (i->index == i->table->tableSize)
+		i->isValid = False;
+}
+
+lhash_iter lhash_begin(LHashTable* table)
+{
+	lhash_iter i;
+
+	i.isValid = True;
+	i.table = table;
+
+	find_next_bucket(&i, 0u);
+
+	if (i.index == table->tableSize)
+		i.isValid = False;
+
+	return i;
+}
+lhash_iter lhash_end();
+
+void lhash_set_next(lhash_iter* current)
+{
+	if (current->isValid == False) return;
+
+	current->current = current->current->next;
+	if (current->current == NULL)
+		find_next_bucket(current, current->index + 1);
 }
