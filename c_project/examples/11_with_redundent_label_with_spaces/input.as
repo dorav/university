@@ -1,2 +1,2 @@
      MAIN:     rts     
-stop
+main2:stop

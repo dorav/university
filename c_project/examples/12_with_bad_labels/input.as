@@ -32,6 +32,10 @@ main: rts
 ; Label can't be keywords or registers
 stop: rts
 r1: rts
+r8: rts
+PSW:rts
+PC:rts
+SP:stop
 
 ; Not supporting two labels at the same line
 JABA: THE: HAT: rts

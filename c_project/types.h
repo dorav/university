@@ -52,5 +52,9 @@ typedef struct
 	unsigned int lineNumber;
 } Symbol;
 
+typedef struct
+{
+	char name[10];
+} Register;
 
 #endif /* TYPES_H_ */

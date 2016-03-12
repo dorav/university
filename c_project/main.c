@@ -42,6 +42,7 @@ typedef struct
 	unsigned int numberOfErrors;
 	OHashTable cmds;
 	LHashTable symbols;
+	LHashTable registers;
 } ProgramData;
 
 LineType getLineType(Line* line)
@@ -181,6 +182,12 @@ boolean validateLabelName_(ProgramData* data, Line* line, const char* labelName)
 	if (ohash_find(&data->cmds, labelName) != NULL)
 	{
 		printf("At line %d, label name \"%s\", is an instruction keyword, choose a different name.\n", line->lineNumber, labelName);
+		return False;
+	}
+
+	if (lhash_find(&data->registers, labelName) != NULL)
+	{
+		printf("At line %d, label name \"%s\", is a register name, choose a different name.\n", line->lineNumber, labelName);
 		return False;
 	}
 
@@ -478,30 +485,86 @@ void secondRun(ProgramData* data,
 	}
 }
 
-boolean commandNameCmd(const KeyType key, const ObjectType object)
+boolean commandNameCmp(const KeyType key, const ObjectType object)
 {
 	return strcmp((const char*)key, ((const UserCommand*)object)->name) == 0;
 }
 
 void initCommandsTable(ProgramData* data)
 {
-	ObjectMetadata meta = { prehashCommand, commandNameCmd, sizeof(UserCommand) };
+	ObjectMetadata meta = { prehashCommand, commandNameCmp, sizeof(UserCommand) };
 
 	data->cmds = newOHashTable(meta);
 	ohash_insert(&data->cmds, stopCommand.name, &stopCommand);
 	ohash_insert(&data->cmds, rtsCommand.name, &rtsCommand);
 }
 
-boolean symbolNameCmd(const KeyType key, const ObjectType object)
+boolean symbolNameCmp(const KeyType key, const ObjectType object)
 {
 	return strcmp((const char*)key, ((const Symbol*)object)->name) == 0;
 }
 
 void initSymbolsTable(ProgramData* data)
 {
-	ObjectMetadata meta = { stupidhash, symbolNameCmd, sizeof(Symbol) };
+	ObjectMetadata meta = { stupidhash, symbolNameCmp, sizeof(Symbol) };
 
 	data->symbols = newLHashTable(meta, 1);
+}
+
+boolean registerNameCmp(const KeyType key, const ObjectType object)
+{
+	return strcmp((const char*)key, ((const Register*)object)->name) == 0;
+}
+
+#define NUM_OF_GENERAL_REGISTERS 1
+
+void insertGeneralRegisters(ProgramData* data)
+{
+	static Register generals[NUM_OF_GENERAL_REGISTERS];
+	int i;
+
+	for (i = 0; i < NUM_OF_GENERAL_REGISTERS; ++i)
+	{
+		generals[i].name[0] = 'r';
+		generals[i].name[1] = i + '1';
+		generals[i].name[2] = '\0';
+
+		lhash_insert(&data->registers, generals[i].name, &generals[i]);
+	}
+}
+
+void insertPCRegister(ProgramData* data)
+{
+	static Register r;
+	strcpy(r.name, "PC");
+	lhash_insert(&data->registers, r.name, &r);
+}
+
+void insertSPRegister(ProgramData* data)
+{
+	static Register r;
+	strcpy(r.name, "SP");
+	lhash_insert(&data->registers, r.name, &r);
+}
+
+void insertPSWRegister(ProgramData* data)
+{
+	static Register r;
+	strcpy(r.name, "PSW");
+	lhash_insert(&data->registers, r.name, &r);
+}
+
+void initRegisters(ProgramData* data)
+{
+	ObjectMetadata meta = { stupidhash, registerNameCmp, sizeof(Register) };
+
+	data->registers = newLHashTable(meta, 1);
+
+	insertGeneralRegisters(data);
+	insertPSWRegister(data);
+	insertPCRegister(data);
+	insertSPRegister(data);
+
 }
 
 int main(int argc, char** argv)
@@ -522,6 +585,7 @@ int main(int argc, char** argv)
 
 	initCommandsTable(&data);
 	initSymbolsTable(&data);
+	initRegisters(&data);
 
 	firstRun(inputFile, &data);
 
