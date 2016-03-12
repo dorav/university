@@ -7,9 +7,11 @@
 
 #include "utility.h"
 
+#include <ctype.h>
 #include <string.h>
 #include "stdlib.h"
 
+#include "types.h"
 boolean isDelimiter(char c, const char* delimiters)
 {
 	while (*delimiters != '\0')
@@ -128,4 +130,21 @@ const char* trim_c(const char* input, const char* prefixes)
 		input++;
 
 	return input;
+}
+
+boolean isSpaces(const char* line)
+{
+	while (*line)
+		if (!isspace(*line))
+			return False;
+		else
+			++line;
+
+	return True;
+}
+
+UserCommandResult nullInstruction()
+{
+	UserCommandResult i = { 0 };
+	return i;
 }

@@ -25,6 +25,8 @@ typedef struct
 	char* data;
 } UserCommandResult;
 
+UserCommandResult nullInstruction();
+
 #define MAX_LINE_SIZE 100
 #define LABEL_MAX_LEN 30
 

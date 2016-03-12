@@ -14,6 +14,8 @@ typedef int boolean;
 #define True 1
 #define False 0
 
+#define UNUSED(thing) (void)thing
+
 typedef struct
 {
 	const char* start;
@@ -25,7 +27,6 @@ token strtok_begin_cp(const char* newstring, const char* delimiters, char* buffe
 token strtok_next(token prev, const char* delimiters);
 token strtok_next_cp(token prev, const char* delimiters, char* buffer);
 void copy_token(const token* t, char* buffer);
-boolean isDelimiter(char c, const char* delimiters);
 
 char* trim(char* input, const char* prefixes);
 const char* trim_c(const char* input, const char* prefixes);
