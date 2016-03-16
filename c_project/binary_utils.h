@@ -9,14 +9,10 @@
 #define BINARY_UTILS_H_
 #include "types.h"
 
-#define OPCODE_LOCATION 6
-#define OPCODE_MASK (0xF << OPCODE_LOCATION)
-
-/* This define is here for compile-time calculation
- * Compile time calculation is needed in c90 for {} initialization of structs */
-#define OPCODE_TO_BINARY(opcode) ((opcode << OPCODE_LOCATION) & OPCODE_MASK)
-
-void putCommandOpcode(UserCommandResult* dest, CommandOpcode value);
+void putCommandOpcode(UserCommandResult* dest, const UserCommand* cmd);
+void putCommandDestAddrMethod(UserCommandResult* dest, AddressMethod method);
+void putDestRegister(UserCommandResult* dest, Register* reg);
+void putDirectAddressLabel(UserCommandResult* dest, Symbol* label);
 char to_32bit(unsigned int value);
 void reverseString(int end, char* buffer);
 int pad_to(int len, char* buffer, int padNum);

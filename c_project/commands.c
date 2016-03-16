@@ -15,6 +15,94 @@
 #include "program_ds_manipulators.h"
 #include "line_parser.h"
 
+Register* referencedRegister(ProgramData* data, const char* arg)
+{
+	return lhash_find(&data->registers, arg);
+}
+
+boolean isRandomAddressing(const char* arg)
+{
+	return arg[0] == '*';
+}
+
+boolean isInstantAddressing(const char* arg)
+{
+	return arg[0] == '#';
+}
+
+UserCommandResult genericSingleArgCommand(Line* line, const UserCommand* command, ProgramData* data)
+{
+	static char argument[LABEL_MAX_LEN];
+	Register* reg;
+	Symbol* label;
+	UserCommandResult result = nullInstruction();
+
+	if (line->firstArgumentLoc == NULL)
+	{
+		printf("At line %d, missing argument for command '%s'.\n", line->lineNumber, command->name);
+		line->hasError = True;
+		return result;
+	}
+
+	if (line->secondArgumentLoc != NULL)
+	{
+		printf("At line %d, too many arguments after command '%s', expected one.\n",
+				line->lineNumber, command->name);
+		line->hasError = True;
+		return result;
+	}
+
+	strtok_begin_cp(line->firstArgumentLoc, space_chars, argument);
+
+	if (isInstantAddressing(argument) &&
+		command->addressingTypes.destAddressingTypes.isInstantAllowed == False)
+	{
+		printf("At line %d, instant addressing ('%s') is not allowed for instruction of type '%s'.\n",
+				line->lineNumber, argument, command->name);
+		line->hasError = True;
+		return result;
+	}
+
+	if (isRandomAddressing(argument) &&
+		command->addressingTypes.destAddressingTypes.isRandomAllowed == False)
+	{
+		printf("At line %d, random addressing ('%s') is not allowed for instruction of type '%s'.\n",
+				line->lineNumber, argument, command->name);
+		line->hasError = True;
+		return result;
+	}
+
+	if ((reg = referencedRegister(data, argument)) != NULL &&
+		command->addressingTypes.destAddressingTypes.isRegisterAllowed)
+	{
+		putCommandDestAddrMethod(&result, RegisterNameAddressing);
+		putDestRegister(&result, reg);
+	}
+	else if (validateLabelName_(data, line, argument) &&
+			 command->addressingTypes.destAddressingTypes.isDirectAllowed)
+	{
+		/* This will only happen on the first run */
+		if ((label = lhash_find(&data->symbols, argument)) == NULL)
+			insertUnresolvedLabel(data, argument, line);
+		else
+		{
+			putCommandDestAddrMethod(&result, DirectAddressing);
+			putDirectAddressLabel(&result, label);
+		}
+	}
+	else /* Invalid label name, error printed by validateLabelName_ */
+	{
+		line->hasError = True;
+		return result;
+	}
+
+	putCommandOpcode(&result, command);
+
+	result.instructionSize = 2;
+
+	return result;
+}
+
 UserCommandResult parseEntryCommand(Line* line, const UserCommand* command, ProgramData* data)
 {
 	static char referencedLabel[LABEL_MAX_LEN];
@@ -108,7 +196,7 @@ UserCommandResult parseNoArgsCommand(Line* line, const UserCommand* command, Pro
 
 	if (line->firstArgumentLoc == NULL)
 	{
-		putCommandOpcode(&result, command->opcode);
+		putCommandOpcode(&result, command);
 		result.instructionSize = 1;
 	}
 	else

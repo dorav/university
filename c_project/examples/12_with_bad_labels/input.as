@@ -31,8 +31,8 @@ main: rts
 
 ; Label can't be keywords or registers
 stop: rts
-r1: rts
-r8: rts
+r0: rts
+r7: rts
 PSW:rts
 PC:rts
 SP:stop

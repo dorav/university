@@ -16,5 +16,6 @@ UserCommandResult nullInstruction();
 UserCommandResult parseEntryCommand(Line* line, const UserCommand* command, ProgramData* data);
 UserCommandResult parseNoArgsCommand(Line* line, const UserCommand* command, ProgramData* data);
 UserCommandResult parseExternCommand(Line* line, const UserCommand* command, ProgramData* data);
+UserCommandResult genericSingleArgCommand(Line* line, const UserCommand* command, ProgramData* data);
 
 #endif /* COMMANDS_H_ */

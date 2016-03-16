@@ -1,10 +1,69 @@
 #include "binary_utils.h"
 
-void putCommandOpcode(UserCommandResult* dest, CommandOpcode value)
+#define TWELVE_BITS_MASK 0xFFF
+#define SIX_BITS_MASK 0x3F
+#define FOUR_BITS_MASK 0xF
+#define TWO_BITS_MASK 0x3
+
+#define OPCODE_LOCATION 6
+#define OPCODE_MASK (FOUR_BITS_MASK << OPCODE_LOCATION)
+
+#define DEST_METHOD_LOCATION 2
+#define DEST_METHOD_MASK (TWO_BITS_MASK << DEST_METHOD_LOCATION)
+
+#define GROUP_LOCATION 10
+#define GROUP_MASK (TWO_BITS_MASK << GROUP_LOCATION)
+
+#define ARE_LOCATION 0
+#define ARE_MASK (TWO_BITS_MASK << ARE_LOCATION)
+
+#define SET_BITS_ON(DATA, PART, BITS) \
+	/* Set the relevant part to zero */\
+	{\
+		DATA &= (~PART##_MASK);\
+	/* Right side of the expression is all zeros other then the bits we want to set
+	 * We then do XOR on the data to change the bits */\
+		DATA ^= ((BITS << PART##_LOCATION) & PART##_MASK);\
+	}
+
+void putCommandOpcode(UserCommandResult* dest, const UserCommand* cmd)
 {
-	dest->instructionBits &= (!OPCODE_MASK); /* set all opcode bits off */
-	dest->instructionBits ^= OPCODE_TO_BINARY(value); /* set only the wanted bits on */
+	SET_BITS_ON(dest->instructionBytes.bits, OPCODE, cmd->opcode);
+	SET_BITS_ON(dest->instructionBytes.bits, GROUP, cmd->group);
 }
+
+void putCommandDestAddrMethod(UserCommandResult* dest, AddressMethod method)
+{
+	SET_BITS_ON(dest->instructionBytes.bits, DEST_METHOD, method);
+}
+
+#define DEST_REGISTER_LOCATION 2
+#define DEST_REGISTER_MASK (SIX_BITS_MASK << DEST_REGISTER_LOCATION)
+
+void putDestRegister(UserCommandResult* dest, Register* reg)
+{
+	SET_BITS_ON(dest->firstArgBytes.bits, DEST_REGISTER, reg->number);
+}
+
+#define DIRECT_ADDRESSING_LOCATION 2
+#define DIRECT_ADDRESSING_MASK (TWELVE_BITS_MASK << DIRECT_ADDRESSING_LOCATION)
+
+typedef enum
+{
+	AbsoluteAddressCoding = 0,
+	ExternalAddressCoding = 1,
+	RelocatableAddressCoding = 2
+} AddressCodingType;
+
+void putDirectAddressLabel(UserCommandResult* dest, Symbol* label)
+{
+	SET_BITS_ON(dest->firstArgBytes.bits, DIRECT_ADDRESSING, label->referencedMemAddr);
+	if (label->isExternal)
+		SET_BITS_ON(dest->firstArgBytes.bits, ARE, ExternalAddressCoding)
+	else
+		SET_BITS_ON(dest->firstArgBytes.bits, ARE, RelocatableAddressCoding);
+}
+
 
 char to_32bit(unsigned int value)
 {

@@ -71,7 +71,15 @@ void printInstruction(FILE* f, const ProgramData* data, UserCommandResult i)
 		return;
 
 	to_32basePadded(data->instruction_counter, instructionCounter32base, 3);
-	to_32basePadded(i.instructionBits, instruction32base, 3);
+	to_32basePadded(i.instructionBytes.bits, instruction32base, 3);
+
+	fprintf(f, "%s %s\n", instructionCounter32base, instruction32base);
+
+	if (i.instructionSize == 1)
+		return;
+
+	to_32basePadded(data->instruction_counter + 1, instructionCounter32base, 3);
+	to_32basePadded(i.firstArgBytes.bits, instruction32base, 3);
 
 	fprintf(f, "%s %s\n", instructionCounter32base, instruction32base);
 }
@@ -95,10 +103,23 @@ int getLine(Line* line, FILE* inputFile)
 	return fgets(line->data, MAX_LINE_SIZE, inputFile) == line->data && !feof(inputFile);
 }
 
+void fixSymbolAddresses(ProgramData* data)
+{
+	lhash_iter i;
+	Symbol* current;
+
+	for (i = lhash_begin(&data->symbols); i.isValid; lhash_set_next(&i))
+	{
+		current = (Symbol*) i.current->data;
+		current->referencedMemAddr += data->instruction_counter;
+	}
+}
+
 void firstRun(FILE* inputFile,
 			  ProgramData* data)
 {
 	UserCommandResult parsedLine;
+	Symbol* lineLabel;
 	Line line = { 0 };
 
 	data->inFirstRun = True;
@@ -109,6 +130,12 @@ void firstRun(FILE* inputFile,
 			parsedLine = parseLine(data, &line);
 			if (line.hasError == True)
 				++(data->numberOfErrors);
+
+			if (line.hasLabel)
+			{
+				lineLabel = (Symbol*)lhash_find(&data->symbols, line.labelName);
+				lineLabel->referencedMemAddr = data->instruction_counter;
+			}
 
 			data->instruction_counter += parsedLine.instructionSize;
 		}
@@ -121,8 +148,9 @@ void secondRun(ProgramData* data,
 			   FILE* objectOutFile)
 {
 	UserCommandResult parsed;
-	Symbol* lineLabel;
 	Line line = { 0 };
+
+	fixSymbolAddresses(data);
 
 	while (getLine(&line, inputFile))
 	{
@@ -130,12 +158,6 @@ void secondRun(ProgramData* data,
 		{
 			parsed = parseLine(data, &line);
 			printInstruction(objectOutFile, data, parsed);
-
-			if (line.hasLabel)
-			{
-				lineLabel = (Symbol*)lhash_find(&data->symbols, line.labelName);
-				lineLabel->referencedMemAddr += data->instruction_counter;
-			}
 
 			data->instruction_counter += parsed.instructionSize;
 		}
@@ -202,6 +224,28 @@ void validateEntries(ProgramData* data)
 	}
 }
 
+void validateUnresolvedSymbols(ProgramData* data)
+{
+	lhash_iter i;
+	Symbol* entry;
+	Symbol* referencedLabel;
+
+	for (i = lhash_begin(&data->unresolvedSymbols); i.isValid; lhash_set_next(&i))
+	{
+		entry = (Symbol*) i.current->data;
+		referencedLabel  = lhash_find(&data->symbols, entry->name);
+		if (referencedLabel == NULL)
+		{
+			printf("At line %d, expected label '%s', to be defined somewhere. Label never found.\n",
+					entry->lineNumber, entry->name);
+			data->numberOfErrors++;
+		}
+	}
+
+	/* TODO: empty the unresolved table */
+}
+
+
 void writeEntriesFile(ProgramData* data, const char* inputFileName)
 {
 	static char addr32base[10];
@@ -226,7 +270,7 @@ int main(int argc, char** argv)
 {
 	FILE* inputFile;
 	FILE* objectOutFile;
-	ProgramData data = {0};
+	ProgramData data = initProgramData();
 
 	FILE* status = freopen("log", "w", stdout);
 	if (status == NULL)
@@ -238,16 +282,12 @@ int main(int argc, char** argv)
 
 	validateNumberOfArguments(argc, argv);
 
-	initCommandsTable(&data);
-	initSymbolsTable(&data);
-	initRegisters(&data);
-	initEntries(&data);
-
 	firstRun(inputFile, &data);
 
 	fclose(inputFile);
 
 	validateEntries(&data);
+	validateUnresolvedSymbols(&data);
 
 	inputFile = getInputfile(argv[FILE_NAME_ARG_INDEX]);
 

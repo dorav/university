@@ -1,0 +1,6 @@
+At line 5, missing argument for command 'not'.
+At line 8, label name "rts", is an instruction keyword, choose a different name.
+At line 9, label name ".entry", cannot start with a non alphabetic character.
+At line 12, instant addressing ('#3') is not allowed for instruction of type 'not'.
+At line 13, random addressing ('*') is not allowed for instruction of type 'not'.
+At line 2, expected label 'r9', to be defined somewhere. Label never found.

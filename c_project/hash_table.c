@@ -241,7 +241,6 @@ lhash_iter lhash_begin(LHashTable* table)
 
 	return i;
 }
-lhash_iter lhash_end();
 
 void lhash_set_next(lhash_iter* current)
 {

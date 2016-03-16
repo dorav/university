@@ -9,8 +9,8 @@ At line 17, label name "4Main", cannot start with a non alphabetic character.
 At line 20, label name "a234567890123456789012345678901", cannot be more then 30 chars long.
 At line 27, invalid label definition 'MAIN', collision with label defined at line 26
 At line 33, label name "stop", is an instruction keyword, choose a different name.
-At line 34, label name "r1", is a register name, choose a different name.
-At line 35, label name "r8", is a register name, choose a different name.
+At line 34, label name "r0", is a register name, choose a different name.
+At line 35, label name "r7", is a register name, choose a different name.
 At line 36, label name "PSW", is a register name, choose a different name.
 At line 37, label name "PC", is a register name, choose a different name.
 At line 38, label name "SP", is a register name, choose a different name.

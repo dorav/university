@@ -12,14 +12,30 @@
 
 typedef enum
 {
-	NoOpcode = -1,
+	InvalidOpcode = -1,
+	NotOpcode = 4,
 	RtsOpcode = 14,
 	StopOpcode = 15
 } CommandOpcode;
 
+typedef enum
+{
+	InstantAddressing = 0,
+	DirectAddressing = 1,
+	RandomAddressing = 2,
+	RegisterNameAddressing = 3
+} AddressMethod;
+
 typedef struct
 {
-	unsigned int instructionBits;
+	unsigned int bits : 15;
+} CustomByte;
+
+typedef struct
+{
+	CustomByte instructionBytes;
+	CustomByte firstArgBytes;
+	CustomByte secondArgBytes;
 	unsigned int instructionSize;
 	unsigned int dataSize;
 	char* data;
@@ -53,16 +69,43 @@ typedef struct
 	LHashTable symbols;
 	LHashTable registers;
 	LHashTable entries;
+	LHashTable unresolvedSymbols;
 } ProgramData;
 
 struct UserCommand;
 
 typedef UserCommandResult (*CommandHandler)(Line*, const struct UserCommand*, ProgramData* data);
 
+typedef enum
+{
+	SpecialGroup = 0,
+	NoArgsGroup = 0,
+	SingleArgGroup = 1,
+	TwoArgsGroup = 2
+} CommandGroup;
+
+typedef struct
+{
+	boolean isInstantAllowed;
+	boolean isDirectAllowed;
+	boolean isRandomAllowed;
+	boolean isRegisterAllowed;
+} AllowedAddressingTypes;
+
+typedef struct
+{
+	AllowedAddressingTypes sourceAddressingTypes;
+	AllowedAddressingTypes destAddressingTypes;
+} AllowedAddressings;
+
 struct UserCommand
 {
 	CommandOpcode opcode;
 	CommandHandler handler;
+	CommandGroup group;
+
+	AllowedAddressings addressingTypes;
+
 	char name[10];
 };
 
@@ -78,6 +121,7 @@ typedef struct
 
 typedef struct
 {
+	int number;
 	char name[10];
 } Register;
 

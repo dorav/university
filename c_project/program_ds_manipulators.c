@@ -13,6 +13,7 @@
 #include "utility.h"
 
 #include "commands.h"
+#include "specific_commands_factories.h"
 
 /* Internal function for calculating a given command's hash code.
  * command parameter must not be NULL.
@@ -41,6 +42,11 @@ Symbol* newSymbol(const char* labelName, Line* line)
 	strcpy(s->name, labelName);
 
 	return s;
+}
+
+void insertUnresolvedLabel(ProgramData* data, const char* labelName, Line* line)
+{
+	lhash_insert(&data->unresolvedSymbols, labelName, newSymbol(labelName, line));
 }
 
 void insertEntry(ProgramData* data, const char* labelName, Line* line)
@@ -82,13 +88,6 @@ boolean symbolNameCmp(const KeyType key, const ObjectType object)
 	return strcmp((const char*)key, ((const Symbol*)object)->name) == 0;
 }
 
-void initSymbolsTable(ProgramData* data)
-{
-	ObjectMetadata meta = { stupidhash, symbolNameCmp, sizeof(Symbol) };
-
-	data->symbols = newLHashTable(meta, 1);
-}
-
 boolean registerNameCmp(const KeyType key, const ObjectType object)
 {
 	return strcmp((const char*)key, ((const Register*)object)->name) == 0;
@@ -125,27 +124,48 @@ void insertGeneralRegisters(ProgramData* data)
 	for (i = 0; i < NUM_OF_GENERAL_REGISTERS; ++i)
 	{
 		generals[i].name[0] = 'r';
-		generals[i].name[1] = i + '1';
+		generals[i].name[1] = i + '0';
 		generals[i].name[2] = '\0';
+		generals[i].number = i;
 
 		lhash_insert(&data->registers, generals[i].name, &generals[i]);
 	}
 }
 
+void initSymbolsTable(ProgramData* data)
+{
+	ObjectMetadata meta = { stupidhash, symbolNameCmp, sizeof(Symbol) };
+
+	data->symbols = newLHashTable(meta, 1);
+}
+
+UserCommand entryCommand;
+UserCommand externCommand;
+UserCommand rtsCommand;
+UserCommand stopCommand;
+UserCommand notCommand;
+
 void initCommandsTable(ProgramData* data)
 {
-	static UserCommand rtsCommand = { RtsOpcode, parseNoArgsCommand, "rts" };
-	static UserCommand stopCommand = { StopOpcode, parseNoArgsCommand,  "stop" };
-	static UserCommand entryCommand = { NoOpcode, parseEntryCommand, ".entry" };
-	static UserCommand externCommand = { NoOpcode, parseExternCommand, ".extern" };
-
 	ObjectMetadata meta = { prehashCommand, commandNameCmp, sizeof(UserCommand) };
+
+	/* Special commands */
+	entryCommand = makeEntryCommand();
+	externCommand = makeExternCommand();
+
+	/* No args commands */
+	rtsCommand = makeRtsCommand();
+	stopCommand = makeStopCommand();
+
+	/* Single args commands */
+	notCommand = makeNotCommand();
 
 	data->cmds = newOHashTable(meta);
 	ohash_insert(&data->cmds, stopCommand.name, &stopCommand);
 	ohash_insert(&data->cmds, rtsCommand.name, &rtsCommand);
 	ohash_insert(&data->cmds, entryCommand.name, &entryCommand);
 	ohash_insert(&data->cmds, externCommand.name, &externCommand);
+	ohash_insert(&data->cmds, notCommand.name, &notCommand);
 }
 
 void initRegisters(ProgramData* data)
@@ -162,7 +182,27 @@ void initRegisters(ProgramData* data)
 
 void initEntries(ProgramData* data)
 {
-	ObjectMetadata meta = { stupidhash, registerNameCmp, sizeof(Register) };
+	ObjectMetadata meta = { stupidhash, symbolNameCmp, sizeof(Register) };
 
 	data->entries = newLHashTable(meta, 1);
+}
+
+void initUnresolvedSymbols(ProgramData* data)
+{
+	ObjectMetadata meta = { stupidhash, symbolNameCmp, sizeof(Register) };
+
+	data->unresolvedSymbols = newLHashTable(meta, 1);
+}
+
+ProgramData initProgramData()
+{
+	ProgramData data = { 0 };
+
+	initCommandsTable(&data);
+	initSymbolsTable(&data);
+	initRegisters(&data);
+	initEntries(&data);
+	initUnresolvedSymbols(&data);
+
+	return data;
 }
