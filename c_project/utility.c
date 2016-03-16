@@ -132,6 +132,14 @@ const char* trim_c(const char* input, const char* prefixes)
 	return input;
 }
 
+boolean hasLineEnd(const char* line)
+{
+	while (*line != '\0')
+		if ((*line++) == '\n')
+			return True;
+	return False;
+}
+
 boolean isSpaces(const char* line)
 {
 	while (*line)

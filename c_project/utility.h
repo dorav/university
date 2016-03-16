@@ -22,6 +22,7 @@ typedef struct
 	const char* end;
 } token;
 
+boolean hasLineEnd(const char* line);
 token strtok_begin(const char* newstring, const char* delimiters);
 token strtok_begin_cp(const char* newstring, const char* delimiters, char* buffer);
 token strtok_next(token prev, const char* delimiters);

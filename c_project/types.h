@@ -43,7 +43,7 @@ typedef struct
 
 UserCommandResult nullInstruction();
 
-#define MAX_LINE_SIZE 100
+#define MAX_LINE_SIZE 101
 #define LABEL_MAX_LEN 30
 
 typedef struct

@@ -95,12 +95,27 @@ void printCounterHeader(FILE* f, const ProgramData* data)
 	fprintf(f, "%s %s\n", instructionCounter32base, dataCounter2base);
 }
 
-int getLine(Line* line, FILE* inputFile)
+boolean getLine(Line* line, FILE* inputFile)
 {
 	Line newLine = { 0 };
 	newLine.lineNumber = line->lineNumber + 1;
 	*line = newLine;
-	return fgets(line->data, MAX_LINE_SIZE, inputFile) == line->data && !feof(inputFile);
+
+	if (fgets(line->data, MAX_LINE_SIZE, inputFile) == NULL)
+	{
+		if (ferror(inputFile))
+			printf("At line %d, Unknown error occurred. Program was unable to read the line, "
+					"errorno = %d.\n", line->lineNumber, feof(inputFile));
+		return False;
+	}
+
+	if (!hasLineEnd(line->data))
+	{
+		printf("At line %d, line is too long, max line length = %d.",
+				line->lineNumber, MAX_LINE_SIZE);
+	}
+
+	return True;
 }
 
 void fixSymbolAddresses(ProgramData* data)

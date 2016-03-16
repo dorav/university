@@ -41,6 +41,6 @@ for i in `find . -iname input.as`; do
 			rm $ACTUAL_OB
 		fi
 	else
-		echo "No expectations given!"
+		echo "No expectations given for file $i"
 	fi
 done
