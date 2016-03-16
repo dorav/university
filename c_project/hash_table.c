@@ -2,7 +2,7 @@
  * hash_table.c
  *
  *  Created on: Feb 4, 2016
- *      Author: dorav
+ *      Author: unsigned int
  */
 #include "hash_table.h"
 
@@ -43,7 +43,7 @@ OHashTable newOHashTable(ObjectMetadata objectMetadata)
 	return newOHashTablePreAllocated(objectMetadata, objects, DEFAULT_TABLE_SIZE);
 }
 
-int hash(unsigned int nonUniqueValue, unsigned int iteration, unsigned int tableSize)
+unsigned int hash(unsigned int nonUniqueValue, unsigned int iteration, unsigned int tableSize)
 {
 	return (nonUniqueValue + iteration) % tableSize;
 }
@@ -159,7 +159,7 @@ const void* ohash_find(OHashTable* table, const void* key)
 	return NullNode.obj;
 }
 
-LHashTable newLHashTable(ObjectMetadata objectMetadata, int tableSize)
+LHashTable newLHashTable(ObjectMetadata objectMetadata, unsigned int tableSize)
 {
 	LHashTable table;
 
@@ -201,7 +201,7 @@ boolean lhash_insert(LHashTable* table, const void* key, void* object)
 
 void* lhash_find(LHashTable* table, const void* key)
 {
-	int prehash = table->metadata.preHash(key) % table->tableSize;
+	unsigned int prehash = table->metadata.preHash(key) % table->tableSize;
 	struct LTableNode* bucket = &((struct LTableNode*)table->objects)[prehash];
 
 	while (bucket != NULL && bucket->data != NULL)

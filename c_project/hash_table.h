@@ -45,7 +45,7 @@ const void* ohash_find(OHashTable* table, const void* key);
 
 typedef OHashTable LHashTable;
 
-LHashTable newLHashTable(ObjectMetadata objectMetadata, int tableSize);
+LHashTable newLHashTable(ObjectMetadata objectMetadata, unsigned int tableSize);
 boolean lhash_insert(LHashTable* table, const void* key, void* object);
 void* lhash_find(LHashTable* table, const void* key);
 
