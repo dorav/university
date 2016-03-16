@@ -1,9 +1,42 @@
 #!/bin/bash
 
 DIFFTOOL=diff
-[[ $1 == '-g' ]] && DIFFTOOL=vimdiff
+TEST_NAMES=()
+FILES=()
+VERBOSE=false
 
-for i in `find . -iname input.as`; do
+for arg in "$@"
+do
+    if [[ $arg == '-g' ]]; then
+		DIFFTOOL=vimdiff
+	elif [[ $arg == '-v' ]]; then
+		VERBOSE=true
+	else
+		TEST_NAMES+=($arg)
+	fi
+done
+
+if [[ ${#TEST_NAMES[@]} -eq 0 ]]; then
+	if [[ $VERBOSE == true ]]; then
+		echo "No args given, running all tests"
+	fi
+	TEST_NAMES=("?")
+fi
+
+for name in ${TEST_NAMES[*]}; do
+	if [[ $VERBOSE == true ]]; then
+		echo "Will run tests for the files *$name*"
+	fi
+	
+	# this could produce duplicates.
+	FILES+=(`find examples/*${name}*/ -iname input.as`)
+done
+
+for i in ${FILES[*]}; do
+	if [[ $VERBOSE == true ]]; then
+		echo "Running test $i.. "
+	fi
+
 	ACTUAL_OB=ps.ob
 	EXPECTED_OB=$(dirname $i)/expected_ps.ob
 	
@@ -17,8 +50,7 @@ for i in `find . -iname input.as`; do
 	
 	if [ -e $EXPECTED_LOG ]; then
 		diff -b $ACTUAL_LOG $EXPECTED_LOG > /dev/null
-		[ $? -ne 0 ] && (echo File $i: ; $DIFFTOOL $ACTUAL_LOG $EXPECTED_LOG)
-		rm $ACTUAL_LOG
+		[ $? -ne 0 ] && (echo File $i: ; $DIFFTOOL $ACTUAL_LOG $EXPECTED_LOG)		
 		
 	elif [ -e $EXPECTED_OB ]; then
 		if [ ! -e $ACTUAL_OB ]; then
@@ -34,13 +66,15 @@ for i in `find . -iname input.as`; do
 			if [ -e $ACTUAL_ENT ]; then
 				diff -b $ACTUAL_ENT $EXPECTED_ENT > /dev/null
 				[ $? -ne 0 ] && (echo File $i: ; $DIFFTOOL $ACTUAL_ENT $EXPECTED_ENT)
-				rm $ACTUAL_ENT
 			fi
 			diff -b $ACTUAL_OB $EXPECTED_OB > /dev/null
 			[ $? -ne 0 ] && (echo File $i: ; $DIFFTOOL $ACTUAL_OB $EXPECTED_OB)
-			rm $ACTUAL_OB
 		fi
 	else
 		echo "No expectations given for file $i"
 	fi
+	
+	rm -f $ACTUAL_LOG
+	rm -f $ACTUAL_ENT
+	rm -f $ACTUAL_OB
 done
