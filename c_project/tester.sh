@@ -43,6 +43,9 @@ for i in ${FILES[*]}; do
 	ACTUAL_ENT=`basename $i`.ent
 	EXPECTED_ENT=$(dirname $i)/expected_ps.ent
 	
+	ACTUAL_EXT=`basename $i`.ext
+	EXPECTED_EXT=$(dirname $i)/expected_ps.ext
+	
 	ACTUAL_LOG=log
 	EXPECTED_LOG=$(dirname $i)/expected_log
 	
@@ -62,7 +65,21 @@ for i in ${FILES[*]}; do
 					echo File "$i " had problems, no ent file found, log file:
 					cat $ACTUAL_LOG
 				fi
+			elif [ -e $ACTUAL_ENT ]; then
+				echo .ent file was created for test "$i ", but not expectations given
+				$DIFFTOOL $ACTUAL_ENT $EXPECTED_ENT
 			fi
+						
+			if [ -e $EXPECTED_EXT ]; then
+				if [ ! -e $ACTUAL_EXT ]; then
+					echo File "$i " had problems, no ent file found, log file:
+					cat $ACTUAL_LOG
+				fi
+			elif [ -e $ACTUAL_EXT ]; then
+				echo .ext file was created for test "$i ", but not expectations given
+				$DIFFTOOL $ACTUAL_EXT $EXPECTED_EXT
+			fi
+			
 			if [ -e $ACTUAL_ENT ]; then
 				diff -b $ACTUAL_ENT $EXPECTED_ENT > /dev/null
 				[ $? -ne 0 ] && (echo File $i: ; $DIFFTOOL $ACTUAL_ENT $EXPECTED_ENT)
@@ -76,5 +93,6 @@ for i in ${FILES[*]}; do
 	
 	rm -f $ACTUAL_LOG
 	rm -f $ACTUAL_ENT
+	rm -f $ACTUAL_EXT
 	rm -f $ACTUAL_OB
 done
