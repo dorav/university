@@ -1,13 +1,13 @@
 ; without label, to register
-not r2
+red r2
 
 ; with label, to register
-LABEL: not r1
+LABEL: red r1
 
 ; without label, to label that is already defined
-not LABEL
+red LABEL
 
 ; with label, to label that is defined later
-IMLABEL: not OTHER
+IMLABEL: red OTHER
 
 OTHER: stop

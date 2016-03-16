@@ -14,6 +14,7 @@ typedef enum
 {
 	InvalidOpcode = -1,
 	NotOpcode = 4,
+	RedOpcode = 11,
 	RtsOpcode = 14,
 	StopOpcode = 15
 } CommandOpcode;

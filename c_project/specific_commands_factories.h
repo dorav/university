@@ -71,9 +71,19 @@ UserCommand makeNotCommand()
 	u.group = SingleArgGroup;
 	u.handler = genericSingleArgCommand;
 	u.addressingTypes = genericSingleArgCommandRestrictions();
-	/* TODO: not sure about this:
-	 * u.addressingTypes.destAddressingTypes.isDirectAllowed = False;*/
+	u.addressingTypes.destAddressingTypes.isDirectAllowed = False;
 	strcpy(u.name, "not");
+	return u;
+}
+
+UserCommand makeRedCommand()
+{
+	UserCommand u;
+	u.opcode = RedOpcode;
+	u.group = SingleArgGroup;
+	u.handler = genericSingleArgCommand;
+	u.addressingTypes = genericSingleArgCommandRestrictions();
+	strcpy(u.name, "red");
 	return u;
 }
 

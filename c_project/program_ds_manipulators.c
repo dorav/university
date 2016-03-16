@@ -144,6 +144,7 @@ UserCommand externCommand;
 UserCommand rtsCommand;
 UserCommand stopCommand;
 UserCommand notCommand;
+UserCommand redCommand;
 
 void initCommandsTable(ProgramData* data)
 {
@@ -159,6 +160,7 @@ void initCommandsTable(ProgramData* data)
 
 	/* Single args commands */
 	notCommand = makeNotCommand();
+	redCommand = makeRedCommand();
 
 	data->cmds = newOHashTable(meta);
 	ohash_insert(&data->cmds, stopCommand.name, &stopCommand);
@@ -166,6 +168,7 @@ void initCommandsTable(ProgramData* data)
 	ohash_insert(&data->cmds, entryCommand.name, &entryCommand);
 	ohash_insert(&data->cmds, externCommand.name, &externCommand);
 	ohash_insert(&data->cmds, notCommand.name, &notCommand);
+	ohash_insert(&data->cmds, redCommand.name, &redCommand);
 }
 
 void initRegisters(ProgramData* data)

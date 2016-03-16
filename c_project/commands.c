@@ -78,16 +78,25 @@ UserCommandResult genericSingleArgCommand(Line* line, const UserCommand* command
 		putCommandDestAddrMethod(&result, RegisterNameAddressing);
 		putDestRegister(&result, reg);
 	}
-	else if (validateLabelName_(data, line, argument) &&
-			 command->addressingTypes.destAddressingTypes.isDirectAllowed)
+	else if (validateLabelName_(data, line, argument))
 	{
-		/* This will only happen on the first run */
-		if ((label = lhash_find(&data->symbols, argument)) == NULL)
-			insertUnresolvedLabel(data, argument, line);
+		if (command->addressingTypes.destAddressingTypes.isDirectAllowed)
+		{
+			/* This will only happen on the first run */
+			if ((label = lhash_find(&data->symbols, argument)) == NULL)
+				insertUnresolvedLabel(data, argument, line);
+			else
+			{
+				putCommandDestAddrMethod(&result, DirectAddressing);
+				putDirectAddressLabel(&result, label);
+			}
+		}
 		else
 		{
-			putCommandDestAddrMethod(&result, DirectAddressing);
-			putDirectAddressLabel(&result, label);
+			printf("At line %d, direct addressing was used with label \"%s\", but it is not valid for \"%s\" instruction.\n",
+					line->lineNumber, argument, command->name);
+			line->hasError = True;
+			return result;
 		}
 	}
 	else /* Invalid label name, error printed by validateLabelName_ */
