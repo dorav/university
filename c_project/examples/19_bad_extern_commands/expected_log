@@ -1,0 +1,6 @@
+At line 2, meaningless label "LABEL" on ".entry" instruction.
+At line 3, meaningless label "ANOTHER" on ".extern" instruction.
+At line 6, label name "3ABC", cannot start with a non alphabetic character.
+At line 7, label name "#abc", cannot start with a non alphabetic character.
+At line 8, label name "ThisNameIsGoingToBeWayTooLongForAnyOneToBotherToRead", cannot be more then 30 chars long.
+At line 13, extern 'LABEL2' defined twice, previous definition at 10.

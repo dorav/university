@@ -109,6 +109,14 @@ UserCommandResult parseEntryCommand(Line* line, const UserCommand* command, Prog
 	UserCommandResult result = nullInstruction();
 	const Symbol* existing;
 
+	if (line->hasLabel)
+	{
+		printf("At line %d, meaningless label \"%s\" on \"%s\" instruction.\n",
+				line->lineNumber, line->labelName, command->name);
+		line->hasError = True;
+		return result;
+	}
+
 	if (line->firstArgumentLoc != NULL)
 	{
 		strtok_begin_cp(line->firstArgumentLoc, space_chars, referencedLabel);
@@ -125,7 +133,7 @@ UserCommandResult parseEntryCommand(Line* line, const UserCommand* command, Prog
 		/* entry exists in first run is invalid */
 		else if (data->inFirstRun)
 		{
-			printf("At line %d, entry '%s' defined twice, previous definition at %d.", line->lineNumber, referencedLabel, existing->lineNumber);
+			printf("At line %d, entry '%s' defined twice, previous definition at %d.\n", line->lineNumber, referencedLabel, existing->lineNumber);
 			line->hasError = True;
 		}
 
@@ -152,6 +160,14 @@ UserCommandResult parseExternCommand(Line* line, const UserCommand* command, Pro
 	UserCommandResult result = nullInstruction();
 	const Symbol* existing;
 
+	if (line->hasLabel)
+	{
+		printf("At line %d, meaningless label \"%s\" on \"%s\" instruction.\n",
+				line->lineNumber, line->labelName, command->name);
+		line->hasError = True;
+		return result;
+	}
+
 	if (line->firstArgumentLoc != NULL)
 	{
 		strtok_begin_cp(line->firstArgumentLoc, space_chars, referencedLabel);
@@ -168,7 +184,7 @@ UserCommandResult parseExternCommand(Line* line, const UserCommand* command, Pro
 		/* entry exists in first run is invalid */
 		else if (data->inFirstRun)
 		{
-			printf("At line %d, extern '%s' defined twice, previous definition at %d.", line->lineNumber, referencedLabel, existing->lineNumber);
+			printf("At line %d, extern '%s' defined twice, previous definition at %d.\n", line->lineNumber, referencedLabel, existing->lineNumber);
 			line->hasError = True;
 		}
 
