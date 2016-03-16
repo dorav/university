@@ -52,7 +52,7 @@ void validateNumberOfArguments(int argc, char* argv[])
 	}
 }
 
-FILE* getInputfile(char* fileName)
+FILE* getInputfile(const char* fileName)
 {
 	return fopen(fileName, "r");
 }
@@ -60,39 +60,6 @@ FILE* getInputfile(char* fileName)
 FILE* getObjectOutFile()
 {
 	return fopen("ps.ob", "w");
-}
-
-void printInstruction(FILE* f, const ProgramData* data, UserCommandResult i)
-{
-	static char instruction32base[10];
-	static char instructionCounter32base[10];
-
-	if (i.instructionSize == 0)
-		return;
-
-	to_32basePadded(data->instruction_counter, instructionCounter32base, 3);
-	to_32basePadded(i.instructionBytes.bits, instruction32base, 3);
-
-	fprintf(f, "%s %s\n", instructionCounter32base, instruction32base);
-
-	if (i.instructionSize == 1)
-		return;
-
-	to_32basePadded(data->instruction_counter + 1, instructionCounter32base, 3);
-	to_32basePadded(i.firstArgBytes.bits, instruction32base, 3);
-
-	fprintf(f, "%s %s\n", instructionCounter32base, instruction32base);
-}
-
-void printCounterHeader(FILE* f, const ProgramData* data)
-{
-	static char instructionCounter32base[10];
-	static char dataCounter2base[10];
-
-	to_32base(data->instruction_counter, instructionCounter32base);
-	to_32base(data->data_counter, dataCounter2base);
-
-	fprintf(f, "%s %s\n", instructionCounter32base, dataCounter2base);
 }
 
 boolean getLine(Line* line, FILE* inputFile)
@@ -190,39 +157,6 @@ void secondRun(ProgramData* data,
 }
 
 #define ENTRY_FILE_EXT ".ent"
-/* For both linux and windows */
-#define DIRECTORY_DELIMITERS "/\\"
-
-char* getFileNameWithExt(const char* inputFileName, const char* ext)
-{
-	int outputFileNameLen = strlen(inputFileName) + strlen(ext) + 1;
-	char* outputFileName = calloc(1, outputFileNameLen);
-
-	token t = strtok_begin_cp(inputFileName, DIRECTORY_DELIMITERS, outputFileName);
-	while (strtok_next(t, DIRECTORY_DELIMITERS).start != NULL)
-		t = strtok_next_cp(t, DIRECTORY_DELIMITERS, outputFileName);
-
-	strcat(outputFileName, ext);
-
-	return outputFileName;
-}
-
-FILE* getEntriesOutFile(const char* inputFileName)
-{
-	char* outputFileName = getFileNameWithExt(inputFileName, ENTRY_FILE_EXT);
-	FILE* file;
-
-	file = fopen(outputFileName, "w");
-
-	if (file == NULL)
-	{
-		puts("BAD OUTPUT FILE");
-	}
-
-	free (outputFileName);
-
-	return file;
-}
 
 void validateEntries(ProgramData* data)
 {
@@ -275,7 +209,7 @@ void writeEntriesFile(ProgramData* data, const char* inputFileName)
 {
 	static char addr32base[10];
 
-	FILE* entriesFile = getEntriesOutFile(inputFileName);
+	FILE* entriesFile = getOutFile(inputFileName, ENTRY_FILE_EXT);
 	lhash_iter i;
 	Symbol* entry;
 	Symbol* referencedLabel;
@@ -295,17 +229,20 @@ int main(int argc, char** argv)
 {
 	FILE* inputFile;
 	FILE* objectOutFile;
-	ProgramData data = initProgramData();
+	ProgramData data = { 0 };
 
 	FILE* status = freopen("log", "w", stdout);
 	if (status == NULL)
 		puts("Bad redirect");
 
-	inputFile = getInputfile(argv[FILE_NAME_ARG_INDEX]);
-	if (inputFile == NULL)
-		puts("BAD FILE");
 
 	validateNumberOfArguments(argc, argv);
+
+	data = initProgramData(argv[FILE_NAME_ARG_INDEX]);
+
+	inputFile = getInputfile(data.inputFileName);
+	if (inputFile == NULL)
+		puts("BAD FILE");
 
 	firstRun(inputFile, &data);
 
@@ -314,7 +251,7 @@ int main(int argc, char** argv)
 	validateEntries(&data);
 	validateUnresolvedSymbols(&data);
 
-	inputFile = getInputfile(argv[FILE_NAME_ARG_INDEX]);
+	inputFile = getInputfile(data.inputFileName);
 
 	if (data.numberOfErrors == 0)
 	{
@@ -332,11 +269,14 @@ int main(int argc, char** argv)
 		fclose(objectOutFile);
 
 		if (data.entries.numberOfUsed > 0)
-			writeEntriesFile(&data, argv[FILE_NAME_ARG_INDEX]);
+			writeEntriesFile(&data, data.inputFileName);
 	}
 
 	fclose(status);
 	fclose(inputFile);
+
+	if (data.externalReferencesFile != NULL)
+		fclose(data.externalReferencesFile);
 
 	return 0;
 }

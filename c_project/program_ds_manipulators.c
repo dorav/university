@@ -197,7 +197,7 @@ void initUnresolvedSymbols(ProgramData* data)
 	data->unresolvedSymbols = newLHashTable(meta, 1);
 }
 
-ProgramData initProgramData()
+ProgramData initProgramData(const char* inputFileName)
 {
 	ProgramData data = { 0 };
 
@@ -206,6 +206,8 @@ ProgramData initProgramData()
 	initRegisters(&data);
 	initEntries(&data);
 	initUnresolvedSymbols(&data);
+
+	data.inputFileName = inputFileName;
 
 	return data;
 }

@@ -7,6 +7,7 @@
 
 #ifndef UTILITY_H_
 #define UTILITY_H_
+#include <stdio.h>
 
 typedef int boolean;
 #define Equal 1
@@ -31,5 +32,7 @@ void copy_token(const token* t, char* buffer);
 
 char* trim(char* input, const char* prefixes);
 const char* trim_c(const char* input, const char* prefixes);
+
+FILE* getOutFile(const char* inputFileName, const char* extention);
 
 #endif /* UTILITY_H_ */

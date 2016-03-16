@@ -13,6 +13,10 @@ void putCommandOpcode(UserCommandResult* dest, const UserCommand* cmd);
 void putCommandDestAddrMethod(UserCommandResult* dest, AddressMethod method);
 void putDestRegister(UserCommandResult* dest, Register* reg);
 void putDirectAddressLabel(UserCommandResult* dest, Symbol* label);
+
+void printInstruction(FILE* f, const ProgramData* data, UserCommandResult i);
+void printCounterHeader(FILE* f, const ProgramData* data);
+
 char to_32bit(unsigned int value);
 void reverseString(int end, char* buffer);
 int pad_to(int len, char* buffer, int padNum);

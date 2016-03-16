@@ -42,6 +42,7 @@ void putCommandDestAddrMethod(UserCommandResult* dest, AddressMethod method)
 
 void putDestRegister(UserCommandResult* dest, Register* reg)
 {
+	putCommandDestAddrMethod(dest, RegisterNameAddressing);
 	SET_BITS_ON(dest->firstArgBytes.bits, DEST_REGISTER, reg->number);
 }
 
@@ -57,13 +58,15 @@ typedef enum
 
 void putDirectAddressLabel(UserCommandResult* dest, Symbol* label)
 {
-	SET_BITS_ON(dest->firstArgBytes.bits, DIRECT_ADDRESSING, label->referencedMemAddr);
+	putCommandDestAddrMethod(dest, DirectAddressing);
 	if (label->isExternal)
 		SET_BITS_ON(dest->firstArgBytes.bits, ARE, ExternalAddressCoding)
 	else
+	{
+		SET_BITS_ON(dest->firstArgBytes.bits, DIRECT_ADDRESSING, label->referencedMemAddr);
 		SET_BITS_ON(dest->firstArgBytes.bits, ARE, RelocatableAddressCoding);
+	}
 }
-
 
 char to_32bit(unsigned int value)
 {
@@ -110,4 +113,37 @@ void to_32basePadded(unsigned int value, char* buffer, int padSize)
 void to_32base(unsigned int value, char* buffer)
 {
 	to_32basePadded(value, buffer, 0);
+}
+
+void printInstruction(FILE* f, const ProgramData* data, UserCommandResult i)
+{
+	static char instruction32base[10];
+	static char instructionCounter32base[10];
+
+	if (i.instructionSize == 0)
+		return;
+
+	to_32basePadded(data->instruction_counter, instructionCounter32base, 3);
+	to_32basePadded(i.instructionBytes.bits, instruction32base, 3);
+
+	fprintf(f, "%s %s\n", instructionCounter32base, instruction32base);
+
+	if (i.instructionSize == 1)
+		return;
+
+	to_32basePadded(data->instruction_counter + 1, instructionCounter32base, 3);
+	to_32basePadded(i.firstArgBytes.bits, instruction32base, 3);
+
+	fprintf(f, "%s %s\n", instructionCounter32base, instruction32base);
+}
+
+void printCounterHeader(FILE* f, const ProgramData* data)
+{
+	static char instructionCounter32base[10];
+	static char dataCounter2base[10];
+
+	to_32base(data->instruction_counter, instructionCounter32base);
+	to_32base(data->data_counter, dataCounter2base);
+
+	fprintf(f, "%s %s\n", instructionCounter32base, dataCounter2base);
 }

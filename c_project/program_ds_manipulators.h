@@ -10,7 +10,7 @@
 
 #include "types.h"
 
-ProgramData initProgramData();
+ProgramData initProgramData(const char* inputFileName);
 
 void insertUnresolvedLabel(ProgramData* data, const char* labelName, Line* line);
 void insertEntry(ProgramData* data, const char* labelName, Line* line);

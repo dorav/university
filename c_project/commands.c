@@ -30,6 +30,24 @@ boolean isInstantAddressing(const char* arg)
 	return arg[0] == '#';
 }
 
+#define EXT_FILE_NAME ".ext"
+
+void initExtFile(ProgramData* data)
+{
+	data->externalReferencesFile = getOutFile(data->inputFileName, EXT_FILE_NAME);
+}
+
+void writeExternalReferenceToFile(ProgramData* data, Symbol* label, unsigned int address)
+{
+	static char addr32base[10];
+
+	if (data->externalReferencesFile == NULL)
+		initExtFile(data);
+
+	to_32base(address, addr32base);
+	fprintf(data->externalReferencesFile, "%s %s\n", label->name, addr32base);
+}
+
 UserCommandResult genericSingleArgCommand(Line* line, const UserCommand* command, ProgramData* data)
 {
 	static char argument[MAX_LINE_SIZE];
@@ -75,7 +93,6 @@ UserCommandResult genericSingleArgCommand(Line* line, const UserCommand* command
 	if ((reg = referencedRegister(data, argument)) != NULL &&
 		command->addressingTypes.destAddressingTypes.isRegisterAllowed)
 	{
-		putCommandDestAddrMethod(&result, RegisterNameAddressing);
 		putDestRegister(&result, reg);
 	}
 	else if (validateLabelName_(data, line, argument))
@@ -87,8 +104,10 @@ UserCommandResult genericSingleArgCommand(Line* line, const UserCommand* command
 				insertUnresolvedLabel(data, argument, line);
 			else
 			{
-				putCommandDestAddrMethod(&result, DirectAddressing);
 				putDirectAddressLabel(&result, label);
+
+				if (label->isExternal && data->inFirstRun == False)
+					writeExternalReferenceToFile(data, label, data->instruction_counter + 1);
 			}
 		}
 		else

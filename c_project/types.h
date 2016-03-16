@@ -8,6 +8,7 @@
 #ifndef TYPES_H_
 #define TYPES_H_
 
+#include <stdio.h>
 #include "hash_table.h"
 
 typedef enum
@@ -71,6 +72,9 @@ typedef struct
 	LHashTable registers;
 	LHashTable entries;
 	LHashTable unresolvedSymbols;
+
+	const char* inputFileName;
+	FILE* externalReferencesFile;
 } ProgramData;
 
 struct UserCommand;
