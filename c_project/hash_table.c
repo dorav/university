@@ -43,7 +43,7 @@ OHashTable newOHashTable(ObjectMetadata objectMetadata)
 	return newOHashTablePreAllocated(objectMetadata, objects, DEFAULT_TABLE_SIZE);
 }
 
-int hash(int nonUniqueValue, unsigned int iteration, unsigned int tableSize)
+int hash(unsigned int nonUniqueValue, unsigned int iteration, unsigned int tableSize)
 {
 	return (nonUniqueValue + iteration) % tableSize;
 }
@@ -173,7 +173,7 @@ LHashTable newLHashTable(ObjectMetadata objectMetadata, int tableSize)
 
 boolean lhash_insert(LHashTable* table, const void* key, void* object)
 {
-	int loc = table->metadata.preHash(key) % table->tableSize;
+	unsigned int loc = table->metadata.preHash(key) % table->tableSize;
 	struct LTableNode* bucket = &((struct LTableNode*)table->objects)[loc];
 
 	while (bucket->data != NULL)

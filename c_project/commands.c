@@ -32,7 +32,7 @@ boolean isInstantAddressing(const char* arg)
 
 UserCommandResult genericSingleArgCommand(Line* line, const UserCommand* command, ProgramData* data)
 {
-	static char argument[LABEL_MAX_LEN];
+	static char argument[MAX_LINE_SIZE];
 	Register* reg;
 	Symbol* label;
 	UserCommandResult result = nullInstruction();
@@ -105,7 +105,7 @@ UserCommandResult genericSingleArgCommand(Line* line, const UserCommand* command
 
 UserCommandResult parseEntryCommand(Line* line, const UserCommand* command, ProgramData* data)
 {
-	static char referencedLabel[LABEL_MAX_LEN];
+	static char referencedLabel[MAX_LINE_SIZE];
 	UserCommandResult result = nullInstruction();
 	const Symbol* existing;
 
@@ -148,7 +148,7 @@ UserCommandResult parseEntryCommand(Line* line, const UserCommand* command, Prog
 
 UserCommandResult parseExternCommand(Line* line, const UserCommand* command, ProgramData* data)
 {
-	static char referencedLabel[LABEL_MAX_LEN];
+	static char referencedLabel[MAX_LINE_SIZE];
 	UserCommandResult result = nullInstruction();
 	const Symbol* existing;
 

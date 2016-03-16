@@ -104,15 +104,20 @@ boolean getLine(Line* line, FILE* inputFile)
 	if (fgets(line->data, MAX_LINE_SIZE, inputFile) == NULL)
 	{
 		if (ferror(inputFile))
+		{
 			printf("At line %d, Unknown error occurred. Program was unable to read the line, "
 					"errorno = %d.\n", line->lineNumber, feof(inputFile));
+			line->hasError = True;
+		}
 		return False;
 	}
 
 	if (!hasLineEnd(line->data))
 	{
-		printf("At line %d, line is too long, max line length = %d.",
+		printf("At line %d, line is too long, max line length = %d.\n",
 				line->lineNumber, MAX_LINE_SIZE);
+		line->hasError = True;
+		return False;
 	}
 
 	return True;
@@ -155,6 +160,11 @@ void firstRun(FILE* inputFile,
 			data->instruction_counter += parsedLine.instructionSize;
 		}
 	}
+
+	/* Error while fetching line */
+	if (line.hasError)
+		data->numberOfErrors++;
+
 	data->inFirstRun = False;
 }
 
