@@ -9,10 +9,10 @@
 #define BINARY_UTILS_H_
 #include "types.h"
 
-void putCommandOpcode(UserCommandResult* dest, const UserCommand* cmd);
-void putCommandDestAddrMethod(UserCommandResult* dest, AddressMethod method);
+void putCommandMetadata(UserCommandResult* dest, const UserCommand* cmd);
 void putDestRegister(UserCommandResult* dest, Register* reg);
 void putDirectAddressLabel(UserCommandResult* dest, Symbol* label);
+void putInstantArgument(UserCommandResult* dest, int argument);
 
 void printInstruction(FILE* f, const ProgramData* data, UserCommandResult i);
 void printCounterHeader(FILE* f, const ProgramData* data);

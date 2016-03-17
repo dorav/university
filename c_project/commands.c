@@ -15,6 +15,8 @@
 #include "program_ds_manipulators.h"
 #include "line_parser.h"
 
+const char instantAddressingIndicator[] = "#";
+
 Register* referencedRegister(ProgramData* data, const char* arg)
 {
 	return lhash_find(&data->registers, arg);
@@ -27,7 +29,7 @@ boolean isRandomAddressing(const char* arg)
 
 boolean isInstantAddressing(const char* arg)
 {
-	return arg[0] == '#';
+	return arg[0] == instantAddressingIndicator[0];
 }
 
 #define EXT_FILE_NAME ".ext"
@@ -48,11 +50,54 @@ void writeExternalReferenceToFile(ProgramData* data, Symbol* label, unsigned int
 	fprintf(data->externalReferencesFile, "%s %s\n", label->name, addr32base);
 }
 
+UserCommandResult handleDestDirectAddressing(const char* argument, ProgramData* data, Line* line)
+{
+	UserCommandResult result = nullInstruction();
+	Symbol* label;
+
+	/* This will only happen on the first run */
+	if ((label = lhash_find(&data->symbols, argument)) == NULL)
+		insertUnresolvedLabel(data, argument, line);
+	else
+	{
+		putDirectAddressLabel(&result, label);
+		if (label->isExternal && data->inFirstRun == False)
+			writeExternalReferenceToFile(data, label, data->instruction_counter + 1);
+	}
+
+	return result;
+}
+
+boolean isInRange_InstantAddressing(int number)
+{
+	return number >= -4096 && number <= 4095;
+}
+
+UserCommandResult handleDestInstantAddressing(const char* argument, Line* line)
+{
+	UserCommandResult result = nullInstruction();
+	int number = 0;
+	boolean isNumber;
+	argument = strtok_begin(argument, instantAddressingIndicator).start;
+
+	isNumber = sscanf(argument, "%d", &number);
+	if (isNumber == False || isInRange_InstantAddressing(number) == False)
+	{
+		printf("At line %d, the argument \"%s\" is not a valid decimal number in the range [-4096, 4095].\n",
+				line->lineNumber, argument);
+
+		line->hasError = True;
+		return result;
+	}
+
+	putInstantArgument(&result, number);
+	return result;
+}
+
 UserCommandResult genericSingleArgCommand(Line* line, const UserCommand* command, ProgramData* data)
 {
 	static char argument[MAX_LINE_SIZE];
 	Register* reg;
-	Symbol* label;
 	UserCommandResult result = nullInstruction();
 
 	if (line->firstArgumentLoc == NULL)
@@ -72,51 +117,43 @@ UserCommandResult genericSingleArgCommand(Line* line, const UserCommand* command
 
 	strtok_begin_cp(line->firstArgumentLoc, space_chars, argument);
 
-	if (isInstantAddressing(argument) &&
-		command->addressingTypes.destAddressingTypes.isInstantAllowed == False)
+	if (isInstantAddressing(argument))
 	{
-		printf("At line %d, instant addressing ('%s') is not allowed for instruction of type '%s'.\n",
-				line->lineNumber, argument, command->name);
-		line->hasError = True;
-		return result;
-	}
+		if (command->addressingTypes.destAddressingTypes.isInstantAllowed == False)
+		{
+			printf("At line %d, instant addressing ('%s') is not allowed for instruction of type '%s'.\n",
+					line->lineNumber, argument, command->name);
+			line->hasError = True;
+			return result;
+		}
 
-	if (isRandomAddressing(argument) &&
-		command->addressingTypes.destAddressingTypes.isRandomAllowed == False)
+		result = handleDestInstantAddressing(argument, line);
+	}
+	else if (isRandomAddressing(argument) &&
+			 command->addressingTypes.destAddressingTypes.isRandomAllowed == False)
 	{
 		printf("At line %d, random addressing ('%s') is not allowed for instruction of type '%s'.\n",
 				line->lineNumber, argument, command->name);
 		line->hasError = True;
 		return result;
 	}
-
-	if ((reg = referencedRegister(data, argument)) != NULL &&
-		command->addressingTypes.destAddressingTypes.isRegisterAllowed)
+	else if ((reg = referencedRegister(data, argument)) != NULL &&
+			 command->addressingTypes.destAddressingTypes.isRegisterAllowed)
 	{
 		putDestRegister(&result, reg);
 	}
 	else if (validateLabelName_(data, line, argument))
 	{
-		if (command->addressingTypes.destAddressingTypes.isDirectAllowed)
-		{
-			/* This will only happen on the first run */
-			if ((label = lhash_find(&data->symbols, argument)) == NULL)
-				insertUnresolvedLabel(data, argument, line);
-			else
-			{
-				putDirectAddressLabel(&result, label);
-
-				if (label->isExternal && data->inFirstRun == False)
-					writeExternalReferenceToFile(data, label, data->instruction_counter + 1);
-			}
-		}
-		else
+		if (command->addressingTypes.destAddressingTypes.isDirectAllowed == False)
 		{
 			printf("At line %d, direct addressing was used with label \"%s\", but it is not valid for \"%s\" instruction.\n",
 					line->lineNumber, argument, command->name);
 			line->hasError = True;
+
 			return result;
 		}
+
+		result = handleDestDirectAddressing(argument, data, line);
 	}
 	else /* Invalid label name, error printed by validateLabelName_ */
 	{
@@ -124,7 +161,7 @@ UserCommandResult genericSingleArgCommand(Line* line, const UserCommand* command
 		return result;
 	}
 
-	putCommandOpcode(&result, command);
+	putCommandMetadata(&result, command);
 
 	result.instructionSize = 2;
 
@@ -240,7 +277,7 @@ UserCommandResult parseNoArgsCommand(Line* line, const UserCommand* command, Pro
 
 	if (line->firstArgumentLoc == NULL)
 	{
-		putCommandOpcode(&result, command);
+		putCommandMetadata(&result, command);
 		result.instructionSize = 1;
 	}
 	else

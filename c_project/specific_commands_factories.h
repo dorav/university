@@ -64,18 +64,6 @@ UserCommand makeStopCommand()
 	return u;
 }
 
-UserCommand makeNotCommand()
-{
-	UserCommand u;
-	u.opcode = NotOpcode;
-	u.group = SingleArgGroup;
-	u.handler = genericSingleArgCommand;
-	u.addressingTypes = genericSingleArgCommandRestrictions();
-	u.addressingTypes.destAddressingTypes.isDirectAllowed = False;
-	strcpy(u.name, "not");
-	return u;
-}
-
 UserCommand singleArgCommand(const char* name, CommandOpcode opcode)
 {
 	UserCommand u;
@@ -87,6 +75,20 @@ UserCommand singleArgCommand(const char* name, CommandOpcode opcode)
 	strcpy(u.name, name);
 
 	return u;
+}
+
+UserCommand makeNotCommand()
+{
+	UserCommand u = singleArgCommand("not", NotOpcode);
+	u.addressingTypes.destAddressingTypes.isDirectAllowed = False;
+	return u;
+}
+
+UserCommand makePrnCommand()
+{
+	UserCommand prn = singleArgCommand("prn", PrnOpcode);
+	prn.addressingTypes.destAddressingTypes.isInstantAllowed = True;
+	return prn;
 }
 
 #endif /* SPECIFIC_COMMANDS_FACTORIES_H_ */

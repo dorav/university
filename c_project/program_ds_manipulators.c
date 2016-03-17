@@ -165,6 +165,7 @@ void initCommandsTable(ProgramData* data)
 	insertCommand(data, singleArgCommand("jmp", JmpOpcode));
 	insertCommand(data, singleArgCommand("bne", BneOpcode));
 	insertCommand(data, singleArgCommand("red", RedOpcode));
+	insertCommand(data, makePrnCommand());
 	insertCommand(data, singleArgCommand("jsr", JsrOpcode));
 }
 

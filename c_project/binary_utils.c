@@ -1,5 +1,6 @@
 #include "binary_utils.h"
 
+#define THIRTEEN_BITS_MASK 0x1FFF
 #define TWELVE_BITS_MASK 0xFFF
 #define SIX_BITS_MASK 0x3F
 #define FOUR_BITS_MASK 0xF
@@ -26,7 +27,7 @@
 		DATA ^= ((BITS << PART##_LOCATION) & PART##_MASK);\
 	}
 
-void putCommandOpcode(UserCommandResult* dest, const UserCommand* cmd)
+void putCommandMetadata(UserCommandResult* dest, const UserCommand* cmd)
 {
 	SET_BITS_ON(dest->instructionBytes.bits, OPCODE, cmd->opcode);
 	SET_BITS_ON(dest->instructionBytes.bits, GROUP, cmd->group);
@@ -66,6 +67,15 @@ void putDirectAddressLabel(UserCommandResult* dest, Symbol* label)
 		SET_BITS_ON(dest->firstArgBytes.bits, DIRECT_ADDRESSING, label->referencedMemAddr);
 		SET_BITS_ON(dest->firstArgBytes.bits, ARE, RelocatableAddressCoding);
 	}
+}
+
+#define INSTANT_ADDRESSING_LOCATION 2
+#define INSTANT_ADDRESSING_MASK (THIRTEEN_BITS_MASK << INSTANT_ADDRESSING_LOCATION)
+
+void putInstantArgument(UserCommandResult* dest, int argument)
+{
+	putCommandDestAddrMethod(dest, InstantAddressing);
+	SET_BITS_ON(dest->firstArgBytes.bits, INSTANT_ADDRESSING, argument);
 }
 
 char to_32bit(unsigned int value)
