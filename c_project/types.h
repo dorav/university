@@ -14,8 +14,19 @@
 typedef enum
 {
 	InvalidOpcode = -1,
+
+	/* Single args commands */
 	NotOpcode = 4,
+	ClrOpcode = 5,
+	IncOpcode = 7,
+	DecOpcode = 8,
+	JmpOpcode = 9,
+	BneOpcode = 10,
 	RedOpcode = 11,
+	PrnOpcode = 12,
+	JsrOpcode = 13,
+
+	/* No args commands */
 	RtsOpcode = 14,
 	StopOpcode = 15
 } CommandOpcode;

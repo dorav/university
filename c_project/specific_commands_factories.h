@@ -76,16 +76,17 @@ UserCommand makeNotCommand()
 	return u;
 }
 
-UserCommand makeRedCommand()
+UserCommand singleArgCommand(const char* name, CommandOpcode opcode)
 {
 	UserCommand u;
-	u.opcode = RedOpcode;
+
+	u.opcode = opcode;
 	u.group = SingleArgGroup;
 	u.handler = genericSingleArgCommand;
 	u.addressingTypes = genericSingleArgCommandRestrictions();
-	strcpy(u.name, "red");
+	strcpy(u.name, name);
+
 	return u;
 }
-
 
 #endif /* SPECIFIC_COMMANDS_FACTORIES_H_ */

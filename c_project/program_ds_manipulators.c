@@ -139,36 +139,33 @@ void initSymbolsTable(ProgramData* data)
 	data->symbols = newLHashTable(meta, 1);
 }
 
-UserCommand entryCommand;
-UserCommand externCommand;
-UserCommand rtsCommand;
-UserCommand stopCommand;
-UserCommand notCommand;
-UserCommand redCommand;
+void insertCommand(ProgramData* data, UserCommand cmd)
+{
+	ohash_insert(&data->cmds, cmd.name, &cmd);
+}
 
 void initCommandsTable(ProgramData* data)
 {
 	ObjectMetadata meta = { prehashCommand, commandNameCmp, sizeof(UserCommand) };
+	data->cmds = newOHashTable(meta);
 
 	/* Special commands */
-	entryCommand = makeEntryCommand();
-	externCommand = makeExternCommand();
+	insertCommand(data, makeEntryCommand());
+	insertCommand(data, makeExternCommand());
 
 	/* No args commands */
-	rtsCommand = makeRtsCommand();
-	stopCommand = makeStopCommand();
+	insertCommand(data, makeStopCommand());
+	insertCommand(data, makeRtsCommand());
 
-	/* Single args commands */
-	notCommand = makeNotCommand();
-	redCommand = makeRedCommand();
-
-	data->cmds = newOHashTable(meta);
-	ohash_insert(&data->cmds, stopCommand.name, &stopCommand);
-	ohash_insert(&data->cmds, rtsCommand.name, &rtsCommand);
-	ohash_insert(&data->cmds, entryCommand.name, &entryCommand);
-	ohash_insert(&data->cmds, externCommand.name, &externCommand);
-	ohash_insert(&data->cmds, notCommand.name, &notCommand);
-	ohash_insert(&data->cmds, redCommand.name, &redCommand);
+	/* SingleArgCommands */
+	insertCommand(data, makeNotCommand());
+	insertCommand(data, singleArgCommand("clr", ClrOpcode));
+	insertCommand(data, singleArgCommand("dec", DecOpcode));
+	insertCommand(data, singleArgCommand("inc", IncOpcode));
+	insertCommand(data, singleArgCommand("jmp", JmpOpcode));
+	insertCommand(data, singleArgCommand("bne", BneOpcode));
+	insertCommand(data, singleArgCommand("red", RedOpcode));
+	insertCommand(data, singleArgCommand("jsr", JsrOpcode));
 }
 
 void initRegisters(ProgramData* data)

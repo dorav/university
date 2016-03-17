@@ -4,6 +4,7 @@
 ; The ARE flags are affected but instruction location is still first command
 red ABC
 red another
+bne another
 
 .extern another
 
