@@ -153,7 +153,8 @@ UserCommandResult genericSingleArgCommand(Line* line, const UserCommand* command
 			return result;
 		}
 
-		result = handleDestDirectAddressing(argument, data, line);
+		if (!data->inFirstRun)
+			result = handleDestDirectAddressing(argument, data, line);
 	}
 	else /* Invalid label name, error printed by validateLabelName_ */
 	{
@@ -266,6 +267,12 @@ UserCommandResult parseDataCommand(Line* line, const UserCommand* command, Progr
 		return empty;
 	}
 
+	if (line->hasLabel && data->inFirstRun)
+	{
+		line->label->isDataLabel = True;
+		line->label->referencedMemAddr = data->data_counter;
+	}
+
 	lastArg.start = line->firstArgumentLoc;
 	lastArg.end = line->firstArgumentLoc;
 
@@ -311,7 +318,7 @@ UserCommandResult parseEntryCommand(Line* line, const UserCommand* command, Prog
 	if (line->hasLabel)
 	{
 		printf("At line %d, meaningless label \"%s\" on \"%s\" instruction.\n",
-				line->lineNumber, line->labelName, command->name);
+				line->lineNumber, line->label->name, command->name);
 		line->hasError = True;
 		return result;
 	}
@@ -362,7 +369,7 @@ UserCommandResult parseExternCommand(Line* line, const UserCommand* command, Pro
 	if (line->hasLabel)
 	{
 		printf("At line %d, meaningless label \"%s\" on \"%s\" instruction.\n",
-				line->lineNumber, line->labelName, command->name);
+				line->lineNumber, line->label->name, command->name);
 		line->hasError = True;
 		return result;
 	}

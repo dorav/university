@@ -63,7 +63,12 @@ void insertExtern(ProgramData* data, const char* labelName, Line* line)
 
 void insertLabel(ProgramData* data, const char* labelName, Line* line)
 {
-	lhash_insert(&data->symbols, labelName, newSymbol(labelName, line));
+	Symbol* s = newSymbol(labelName, line);
+
+	/* If it's data label, the data commands will override it */
+	s->referencedMemAddr = data->instruction_counter;
+
+	lhash_insert(&data->symbols, labelName, s);
 }
 
 void registerSymbol(ProgramData* data, const char* labelName, Line* line)

@@ -90,23 +90,29 @@ boolean getLine(Line* line, FILE* inputFile)
 	return True;
 }
 
-void fixSymbolAddresses(ProgramData* data)
+#define BASE_ADDRESS 100
+
+void prepareDataFor2ndRun(ProgramData* data)
 {
 	lhash_iter i;
 	Symbol* current;
 
+
 	for (i = lhash_begin(&data->symbols); i.isValid; lhash_set_next(&i))
 	{
 		current = (Symbol*) i.current->data;
-		current->referencedMemAddr += data->instruction_counter;
+		current->referencedMemAddr += BASE_ADDRESS;
+		if (current->isDataLabel)
+			current->referencedMemAddr += data->instruction_counter;
 	}
+
+	data->instruction_counter = BASE_ADDRESS;
+	data->data_counter = 0;
 }
 
-void firstRun(FILE* inputFile,
-			  ProgramData* data)
+void firstRun(FILE* inputFile, ProgramData* data)
 {
 	UserCommandResult parsedLine;
-	Symbol* lineLabel;
 	Line line = { 0 };
 
 	data->inFirstRun = True;
@@ -117,12 +123,6 @@ void firstRun(FILE* inputFile,
 			parsedLine = parseLine(data, &line);
 			if (line.hasError == True)
 				++(data->numberOfErrors);
-
-			if (line.hasLabel)
-			{
-				lineLabel = (Symbol*)lhash_find(&data->symbols, line.labelName);
-				lineLabel->referencedMemAddr = data->instruction_counter;
-			}
 
 			data->instruction_counter += parsedLine.instructionSize;
 		}
@@ -135,15 +135,12 @@ void firstRun(FILE* inputFile,
 	data->inFirstRun = False;
 }
 
-void printDataStorage(ProgramData* data,
-			   	   	  FILE* objectOutFile)
+void printDataStorage(ProgramData* data, FILE* objectOutFile)
 {
 	unsigned int i;
 
 	for (i = 0; i < data->data_counter; ++i)
-	{
 		printByte(objectOutFile, data->instruction_counter + i, data->dataStorage[i]);
-	}
 }
 
 void secondRun(ProgramData* data,
@@ -152,8 +149,6 @@ void secondRun(ProgramData* data,
 {
 	UserCommandResult parsed;
 	Line line = { 0 };
-
-	fixSymbolAddresses(data);
 
 	while (getLine(&line, inputFile))
 	{
@@ -278,8 +273,8 @@ int main(int argc, char** argv)
 		}
 
 		printCounterHeader(objectOutFile, &data);
-		data.instruction_counter = 100;
-		data.data_counter = 0;
+
+		prepareDataFor2ndRun(&data);
 
 		secondRun(&data, inputFile, objectOutFile);
 		fclose(objectOutFile);

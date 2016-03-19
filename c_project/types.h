@@ -59,11 +59,20 @@ UserCommandResult nullInstruction();
 
 typedef struct
 {
+	char name[LABEL_MAX_LEN];
+	unsigned int lineNumber;
+	unsigned int referencedMemAddr;
+	boolean isExternal;
+	boolean isDataLabel;
+} Symbol;
+
+typedef struct
+{
 	int lineNumber;
 	int hasError;
 	boolean hasLabel;
 	char data[MAX_LINE_SIZE];
-	char labelName[LABEL_MAX_LEN];
+	Symbol* label;
 	const char* commandNameLoc;
 	const char* firstArgumentLoc;
 	const char* secondArgumentLoc;
@@ -129,14 +138,6 @@ struct UserCommand
 };
 
 typedef struct UserCommand UserCommand;
-
-typedef struct
-{
-	char name[LABEL_MAX_LEN];
-	unsigned int lineNumber;
-	unsigned int referencedMemAddr;
-	boolean isExternal;
-} Symbol;
 
 typedef struct
 {

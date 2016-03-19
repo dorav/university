@@ -119,8 +119,8 @@ char* parseLabel(ProgramData* data, Line* line, char* firstToken)
 	if (data->inFirstRun)
 		registerSymbol(data, labelName, line);
 
+	line->label = lhash_find(&data->symbols, labelName);
 	line->hasLabel = True;
-	strcpy(line->labelName, labelName);
 
 	return (char*)strtok_next(labelToken, labelDelimiters).start;
 }
@@ -171,6 +171,8 @@ UserCommandResult parseLine(ProgramData* data, Line* line)
 		/* We need the command name with a null terminator.
 		 * This also returns the command's first argument ptr, so we place it in line */
 		cmdNameTok = strtok_begin_cp(restOfTheLine, space_chars, commandNameString);
+
+		line->label->isDataLabel = False;
 	}
 
 	interpolateParsedData(line, cmdNameTok);
