@@ -13,6 +13,7 @@
 
 UserCommandResult nullInstruction();
 
+UserCommandResult parseDataCommand(Line* line, const UserCommand* command, ProgramData* data);
 UserCommandResult parseEntryCommand(Line* line, const UserCommand* command, ProgramData* data);
 UserCommandResult parseNoArgsCommand(Line* line, const UserCommand* command, ProgramData* data);
 UserCommandResult parseExternCommand(Line* line, const UserCommand* command, ProgramData* data);

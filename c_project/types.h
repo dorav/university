@@ -50,8 +50,6 @@ typedef struct
 	CustomByte firstArgBytes;
 	CustomByte secondArgBytes;
 	unsigned int instructionSize;
-	unsigned int dataSize;
-	char* data;
 } UserCommandResult;
 
 UserCommandResult nullInstruction();
@@ -75,14 +73,19 @@ typedef struct
 typedef struct
 {
 	boolean inFirstRun;
+
 	unsigned int instruction_counter;
 	unsigned int data_counter;
+	CustomByte* dataStorage;
+	unsigned int dataStorageCapacity;
+
 	unsigned int numberOfErrors;
 	OHashTable cmds;
 	LHashTable symbols;
 	LHashTable registers;
 	LHashTable entries;
 	LHashTable unresolvedSymbols;
+
 
 	const char* inputFileName;
 	FILE* externalReferencesFile;
@@ -140,5 +143,10 @@ typedef struct
 	int number;
 	char name[10];
 } Register;
+
+typedef enum
+{
+	AllocationFailure = 1
+} ExitStatus;
 
 #endif /* TYPES_H_ */

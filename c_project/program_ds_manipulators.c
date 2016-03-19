@@ -144,29 +144,34 @@ void insertCommand(ProgramData* data, UserCommand cmd)
 	ohash_insert(&data->cmds, cmd.name, &cmd);
 }
 
-void initCommandsTable(ProgramData* data)
+ProgramData initCommandsTable()
 {
+	ProgramData data = { 0 };
+
 	ObjectMetadata meta = { prehashCommand, commandNameCmp, sizeof(UserCommand) };
-	data->cmds = newOHashTable(meta);
+	data.cmds = newOHashTable(meta);
 
 	/* Special commands */
-	insertCommand(data, makeEntryCommand());
-	insertCommand(data, makeExternCommand());
+	insertCommand(&data, makeEntryCommand());
+	insertCommand(&data, makeExternCommand());
+	insertCommand(&data, makeDataCommand());
 
 	/* No args commands */
-	insertCommand(data, makeStopCommand());
-	insertCommand(data, makeRtsCommand());
+	insertCommand(&data, makeStopCommand());
+	insertCommand(&data, makeRtsCommand());
 
 	/* SingleArgCommands */
-	insertCommand(data, makeNotCommand());
-	insertCommand(data, singleArgCommand("clr", ClrOpcode));
-	insertCommand(data, singleArgCommand("dec", DecOpcode));
-	insertCommand(data, singleArgCommand("inc", IncOpcode));
-	insertCommand(data, singleArgCommand("jmp", JmpOpcode));
-	insertCommand(data, singleArgCommand("bne", BneOpcode));
-	insertCommand(data, singleArgCommand("red", RedOpcode));
-	insertCommand(data, makePrnCommand());
-	insertCommand(data, singleArgCommand("jsr", JsrOpcode));
+	insertCommand(&data, makeNotCommand());
+	insertCommand(&data, singleArgCommand("clr", ClrOpcode));
+	insertCommand(&data, singleArgCommand("dec", DecOpcode));
+	insertCommand(&data, singleArgCommand("inc", IncOpcode));
+	insertCommand(&data, singleArgCommand("jmp", JmpOpcode));
+	insertCommand(&data, singleArgCommand("bne", BneOpcode));
+	insertCommand(&data, singleArgCommand("red", RedOpcode));
+	insertCommand(&data, makePrnCommand());
+	insertCommand(&data, singleArgCommand("jsr", JsrOpcode));
+
+	return data;
 }
 
 void initRegisters(ProgramData* data)
@@ -197,9 +202,7 @@ void initUnresolvedSymbols(ProgramData* data)
 
 ProgramData initProgramData(const char* inputFileName)
 {
-	ProgramData data = { 0 };
-
-	initCommandsTable(&data);
+	ProgramData data = initCommandsTable(&data);
 	initSymbolsTable(&data);
 	initRegisters(&data);
 	initEntries(&data);

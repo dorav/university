@@ -15,4 +15,3 @@ At line 36, label name "PSW", is a register name, choose a different name.
 At line 37, label name "PC", is a register name, choose a different name.
 At line 38, label name "SP", is a register name, choose a different name.
 line 41: No such command "THE:"
-At line 45, line is too long, max line length = 101.

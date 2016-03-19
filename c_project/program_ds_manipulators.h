@@ -18,7 +18,7 @@ void insertExtern(ProgramData* data, const char* labelName, Line* line);
 void insertLabel(ProgramData* data, const char* labelName, Line* line);
 void registerSymbol(ProgramData* data, const char* labelName, Line* line);
 
-void initCommandsTable(ProgramData* data);
+ProgramData initCommandsTable();
 void initSymbolsTable(ProgramData* data);
 void initRegisters(ProgramData* data);
 void initEntries(ProgramData* data);

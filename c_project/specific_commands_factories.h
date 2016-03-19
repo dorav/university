@@ -42,6 +42,18 @@ UserCommand makeExternCommand()
 	return u;
 }
 
+UserCommand makeDataCommand()
+{
+	UserCommand u;
+	u.opcode = InvalidOpcode;
+	u.group = SpecialGroup;
+	u.handler = parseDataCommand;
+	u.addressingTypes = addressingIsIrrelevant,
+	strcpy(u.name, ".data");
+	return u;
+}
+
+
 UserCommand makeRtsCommand()
 {
 	UserCommand u;

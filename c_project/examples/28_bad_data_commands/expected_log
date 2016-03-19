@@ -1,0 +1,10 @@
+At line 1, argument "i" must be a number between [-16384, 16383].
+At line 2, argument "#33" must be a number between [-16384, 16383].
+At line 3, expected to find comma after number.
+At line 4, expected to find comma after number.
+At line 5, expected to find comma after number.
+At line 6, expected to find comma after number.
+At line 7, missing a valid number after comma "1,".
+At line 9, argument "32768" must be a number between [-16384, 16383].
+At line 10, argument "-32769" must be a number between [-16384, 16383].
+At line 13, missing a valid number after comma "1,".

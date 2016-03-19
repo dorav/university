@@ -1,5 +1,6 @@
 #include "binary_utils.h"
 
+#include <stdlib.h>
 #define THIRTEEN_BITS_MASK 0x1FFF
 #define TWELVE_BITS_MASK 0xFFF
 #define SIX_BITS_MASK 0x3F
@@ -125,26 +126,23 @@ void to_32base(unsigned int value, char* buffer)
 	to_32basePadded(value, buffer, 0);
 }
 
+void printByte(FILE* f, unsigned int address, CustomByte b)
+{
+	static char instructionCounter32base[10];
+	static char instruction32base[10];
+
+	to_32basePadded(address, instructionCounter32base, 3);
+	to_32basePadded(b.bits, instruction32base, 3);
+	fprintf(f, "%s %s\n", instructionCounter32base, instruction32base);
+}
+
 void printInstruction(FILE* f, const ProgramData* data, UserCommandResult i)
 {
-	static char instruction32base[10];
-	static char instructionCounter32base[10];
+	if (i.instructionSize > 0)
+		printByte(f, data->instruction_counter, i.instructionBytes);
 
-	if (i.instructionSize == 0)
-		return;
-
-	to_32basePadded(data->instruction_counter, instructionCounter32base, 3);
-	to_32basePadded(i.instructionBytes.bits, instruction32base, 3);
-
-	fprintf(f, "%s %s\n", instructionCounter32base, instruction32base);
-
-	if (i.instructionSize == 1)
-		return;
-
-	to_32basePadded(data->instruction_counter + 1, instructionCounter32base, 3);
-	to_32basePadded(i.firstArgBytes.bits, instruction32base, 3);
-
-	fprintf(f, "%s %s\n", instructionCounter32base, instruction32base);
+	if (i.instructionSize > 1)
+		printByte(f, data->instruction_counter + 1, i.firstArgBytes);
 }
 
 void printCounterHeader(FILE* f, const ProgramData* data)
@@ -156,4 +154,29 @@ void printCounterHeader(FILE* f, const ProgramData* data)
 	to_32base(data->data_counter, dataCounter2base);
 
 	fprintf(f, "%s %s\n", instructionCounter32base, dataCounter2base);
+}
+
+CustomByte getDataStorageNumber(int number)
+{
+	CustomByte byte = { 0 };
+
+	byte.bits = number;
+
+	return byte;
+}
+
+int decimal_data_upper_bound()
+{
+	CustomByte b;
+
+	/* ~0 on the bitfield results in the exact number of bits we want */
+	b.bits = ~0;
+
+	/* Shifting right because we want the number unsigned */
+	return b.bits >> 1;
+}
+
+int decimal_data_lower_bound()
+{
+	return - (decimal_data_upper_bound() + 1);
 }

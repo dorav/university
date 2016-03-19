@@ -79,7 +79,7 @@ boolean getLine(Line* line, FILE* inputFile)
 		return False;
 	}
 
-	if (!hasLineEnd(line->data))
+	if (!hasLineEnd(line->data) && !feof(inputFile))
 	{
 		printf("At line %d, line is too long, max line length = %d.\n",
 				line->lineNumber, MAX_LINE_SIZE);
@@ -135,6 +135,17 @@ void firstRun(FILE* inputFile,
 	data->inFirstRun = False;
 }
 
+void printDataStorage(ProgramData* data,
+			   	   	  FILE* objectOutFile)
+{
+	unsigned int i;
+
+	for (i = 0; i < data->data_counter; ++i)
+	{
+		printByte(objectOutFile, data->instruction_counter + i, data->dataStorage[i]);
+	}
+}
+
 void secondRun(ProgramData* data,
 			   FILE* inputFile,
 			   FILE* objectOutFile)
@@ -151,9 +162,13 @@ void secondRun(ProgramData* data,
 			parsed = parseLine(data, &line);
 			printInstruction(objectOutFile, data, parsed);
 
+			/* The print instruction needs to know the current instruction counter
+			 * thats why this can't be done inside parseLine */
 			data->instruction_counter += parsed.instructionSize;
 		}
 	}
+
+	printDataStorage(data, objectOutFile);
 }
 
 #define ENTRY_FILE_EXT ".ent"
@@ -264,6 +279,7 @@ int main(int argc, char** argv)
 
 		printCounterHeader(objectOutFile, &data);
 		data.instruction_counter = 100;
+		data.data_counter = 0;
 
 		secondRun(&data, inputFile, objectOutFile);
 		fclose(objectOutFile);

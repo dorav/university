@@ -70,7 +70,7 @@ UserCommandResult handleDestDirectAddressing(const char* argument, ProgramData* 
 
 boolean isInRange_InstantAddressing(int number)
 {
-	return number >= -4096 && number <= 4095;
+	return number >= INSTANT_ADDRESSING_LOWER_BOUND && number <= INSTANT_ADDRESSING_UPPER_BOUND;
 }
 
 UserCommandResult handleDestInstantAddressing(const char* argument, Line* line)
@@ -83,8 +83,8 @@ UserCommandResult handleDestInstantAddressing(const char* argument, Line* line)
 	isNumber = sscanf(argument, "%d", &number);
 	if (isNumber == False || isInRange_InstantAddressing(number) == False)
 	{
-		printf("At line %d, the argument \"%s\" is not a valid decimal number in the range [-4096, 4095].\n",
-				line->lineNumber, argument);
+		printf("At line %d, the argument \"%s\" is not a valid decimal number in the range [%d, %d].\n",
+				line->lineNumber, argument, INSTANT_ADDRESSING_LOWER_BOUND, INSTANT_ADDRESSING_UPPER_BOUND);
 
 		line->hasError = True;
 		return result;
@@ -166,6 +166,140 @@ UserCommandResult genericSingleArgCommand(Line* line, const UserCommand* command
 	result.instructionSize = 2;
 
 	return result;
+}
+
+boolean isNum(char c)
+{
+	return c >= '0' && c <= '9';
+}
+
+const char* nextNumber(const char* originalToken, Line* line)
+{
+	static char argument[MAX_LINE_SIZE];
+	const char* currentChar = argument;
+	strtok_begin_cp(originalToken, "\n", argument);
+
+	++currentChar;
+
+	while (isspace(currentChar[0]))
+		currentChar++;
+
+	if (currentChar[0] == '\0')
+		return NULL;
+
+	if (currentChar[0] == ',')
+		currentChar++;
+	else
+	{
+		printf("At line %d, expected to find comma after number.\n", line->lineNumber);
+		line->hasError = True;
+		return currentChar;
+	}
+
+	while (isspace(currentChar[0]))
+		currentChar++;
+
+	if (currentChar[0] != '-' && !isNum(currentChar[0]))
+	{
+		printf("At line %d, missing a valid number after comma \"%s\".\n",
+						line->lineNumber, argument);
+		line->hasError = True;
+	}
+
+	return currentChar;
+}
+
+const char* endOfNumber(const char* number)
+{
+	while (isNum(number[1]))
+		++number;
+
+	return number;
+}
+
+void addDataStorage(ProgramData* data, CustomByte toAdd)
+{
+	CustomByte* newStorageArray;
+	int newSize;
+
+	if (!data->inFirstRun)
+	{
+		if (data->dataStorageCapacity < data->data_counter + 1)
+		{
+			newSize = data->dataStorageCapacity * 2;
+			if (newSize == 0) /* First time */
+			{
+				newSize = 2;
+				newStorageArray = calloc(newSize, sizeof(CustomByte));
+			}
+			else
+				newStorageArray = realloc(data->dataStorage, newSize * sizeof(CustomByte));
+			if (newStorageArray == NULL)
+			{
+				printf("Internal error allocating memory, data storage is probably too big.\n");
+				exit(AllocationFailure);
+			}
+			data->dataStorage = newStorageArray;
+			data->dataStorageCapacity = newSize;
+		}
+
+		data->dataStorage[data->data_counter] = toAdd;
+	}
+
+	data->data_counter++;
+}
+
+UserCommandResult parseDataCommand(Line* line, const UserCommand* command, ProgramData* data)
+{
+	static char argument[MAX_LINE_SIZE];
+	token lastArg;
+	int number = 0;
+
+	UserCommandResult empty = nullInstruction();
+
+	UNUSED(data);
+
+	if (line->firstArgumentLoc == NULL)
+	{
+		printf("At line %d, missing argument for command '%s'.\n", line->lineNumber, command->name);
+		line->hasError = True;
+		return empty;
+	}
+
+	lastArg.start = line->firstArgumentLoc;
+	lastArg.end = line->firstArgumentLoc;
+
+	while (lastArg.start != NULL)
+	{
+		if (line->hasError)
+			return empty;
+
+		if (lastArg.start[0] == '\0')
+		{
+			printf("At line %d, missing a valid number after last comma.\n", line->lineNumber);
+			line->hasError = True;
+			return empty;
+		}
+
+		lastArg.end = endOfNumber(lastArg.start);
+
+		copy_token(&lastArg, argument);
+
+		if (sscanf(argument, "%d", &number) == 0 ||
+			(number < decimal_data_lower_bound() || number > decimal_data_upper_bound()))
+		{
+			printf("At line %d, argument \"%s\" must be a number between [%d, %d].\n",
+					line->lineNumber, argument, decimal_data_lower_bound(), decimal_data_upper_bound());
+			line->hasError = True;
+			return empty;
+		}
+
+		addDataStorage(data, getDataStorageNumber(number));
+
+		lastArg.start = nextNumber(lastArg.end, line);
+	}
+
+	return empty;
 }
 
 UserCommandResult parseEntryCommand(Line* line, const UserCommand* command, ProgramData* data)
