@@ -17,6 +17,16 @@
 
 const char instantAddressingIndicator[] = "#";
 
+void validateNoExcessCharsAfterArg(const token* argToken, Line* line)
+{
+	if (!isSpaces(argToken->end + 1))
+	{
+		printf("At line %d, Found non-space characters after last expected argument.\n",
+				line->lineNumber);
+		line->hasError = True;
+	}
+}
+
 Register* referencedRegister(ProgramData* data, const char* arg)
 {
 	return lhash_find(&data->registers, arg);
@@ -50,9 +60,8 @@ void writeExternalReferenceToFile(ProgramData* data, Symbol* label, unsigned int
 	fprintf(data->externalReferencesFile, "%s %s\n", label->name, addr32base);
 }
 
-UserCommandResult handleDestDirectAddressing(const char* argument, ProgramData* data, Line* line)
+void handleDirectAddressing(const char* argument, ProgramData* data, Line* line, ArgType argType, UserCommandResult* result)
 {
-	UserCommandResult result = nullInstruction();
 	Symbol* label;
 
 	/* This will only happen on the first run */
@@ -60,12 +69,10 @@ UserCommandResult handleDestDirectAddressing(const char* argument, ProgramData* 
 		insertUnresolvedLabel(data, argument, line);
 	else
 	{
-		putDirectAddressLabel(&result, label);
+		putDirectAddressLabel(result, label, argType);
 		if (label->isExternal && data->inFirstRun == False)
 			writeExternalReferenceToFile(data, label, data->instruction_counter + 1);
 	}
-
-	return result;
 }
 
 boolean isInRange_InstantAddressing(int number)
@@ -73,24 +80,173 @@ boolean isInRange_InstantAddressing(int number)
 	return number >= INSTANT_ADDRESSING_LOWER_BOUND && number <= INSTANT_ADDRESSING_UPPER_BOUND;
 }
 
-UserCommandResult handleDestInstantAddressing(const char* argument, Line* line)
+int extractNumberArg(const char* argument, Line* line)
 {
-	UserCommandResult result = nullInstruction();
-	int number = 0;
+	int number;
 	boolean isNumber;
 	argument = strtok_begin(argument, instantAddressingIndicator).start;
-
 	isNumber = sscanf(argument, "%d", &number);
 	if (isNumber == False || isInRange_InstantAddressing(number) == False)
 	{
 		printf("At line %d, the argument \"%s\" is not a valid decimal number in the range [%d, %d].\n",
-				line->lineNumber, argument, INSTANT_ADDRESSING_LOWER_BOUND, INSTANT_ADDRESSING_UPPER_BOUND);
-
+				line->lineNumber, argument, INSTANT_ADDRESSING_LOWER_BOUND,
+				INSTANT_ADDRESSING_UPPER_BOUND);
 		line->hasError = True;
-		return result;
 	}
 
-	putInstantArgument(&result, number);
+	return number;
+}
+
+UserCommandResult handleInstantAddressing(const char* argument, Line* line, ArgType argType)
+{
+	UserCommandResult result = nullInstruction();
+	int number = extractNumberArg(argument, line);
+
+	if (line->hasError)
+		return result;
+
+	putInstantArgument(&result, number, argType);
+	return result;
+}
+
+UserCommandResult handleSourceOperand(ProgramData* data, Line* line, const UserCommand* command)
+{
+	static char argumentWithSpaces[MAX_LINE_SIZE];
+	static char argument[MAX_LINE_SIZE];
+	UserCommandResult result = nullInstruction();
+	Register* reg;
+
+	strtok_begin_cp(line->firstArgumentLoc, ",", argumentWithSpaces);
+	strtok_begin_cp(argumentWithSpaces, space_chars, argument);
+
+	if (isInstantAddressing(argument))
+	{
+		if (command->addressingTypes.sourceAddressingTypes.isInstantAllowed == False)
+		{
+			printf("At line %d, source instant addressing ('%s') is not allowed for instruction of type '%s'.\n",
+					line->lineNumber, argument, command->name);
+			line->hasError = True;
+			return result;
+		}
+
+		result = handleInstantAddressing(argument, line, SourceArg);
+	}
+	else if ((reg = referencedRegister(data, argument)) != NULL &&
+			 command->addressingTypes.sourceAddressingTypes.isRegisterAllowed)
+	{
+		putSrcRegister(&result, reg);
+	}
+	else if (validateLabelName_(data, line, argument))
+	{
+		if (command->addressingTypes.sourceAddressingTypes.isDirectAllowed == False)
+		{
+			printf("At line %d, source direct addressing was used with label \"%s\", but it is not valid for \"%s\" instruction.\n",
+					line->lineNumber, argument, command->name);
+			line->hasError = True;
+
+			return result;
+		}
+
+		if (!data->inFirstRun)
+			handleDirectAddressing(argument, data, line, SourceArg, &result);
+	}
+	else
+	{
+		line->hasError = True;
+	}
+
+
+	return result;
+}
+
+UserCommandResult handleDestOperand(ProgramData* data, Line* line, const UserCommand* command, UserCommandResult result)
+{
+	static char argument[MAX_LINE_SIZE];
+	Register* reg;
+
+	strtok_begin_cp(line->secondArgumentLoc, space_chars, argument);
+
+	if (isInstantAddressing(argument))
+	{
+		if (command->addressingTypes.destAddressingTypes.isInstantAllowed == False)
+		{
+			printf("At line %d, destination instant addressing ('%s') is not allowed for instruction of type '%s'.\n",
+					line->lineNumber, argument, command->name);
+			line->hasError = True;
+			return result;
+		}
+
+		result = handleInstantAddressing(argument, line, SourceArg);
+	}
+	else if ((reg = referencedRegister(data, argument)) != NULL &&
+			 command->addressingTypes.destAddressingTypes.isRegisterAllowed)
+	{
+		putDestRegister(&result, reg);
+	}
+	else if (validateLabelName_(data, line, argument))
+	{
+		if (command->addressingTypes.destAddressingTypes.isDirectAllowed == False)
+		{
+			printf("At line %d, destination direct addressing was used with label \"%s\", but it is not valid for \"%s\" instruction.\n",
+					line->lineNumber, argument, command->name);
+			line->hasError = True;
+
+			return result;
+		}
+
+		if (!data->inFirstRun)
+			handleDirectAddressing(argument, data, line, DestArg, &result);
+	}
+
+	return result;
+}
+
+void validateTwoArgCommandArgNum(const UserCommand* command, Line* line)
+{
+	if (line->firstArgumentLoc == NULL)
+	{
+		printf("At line %d, missing arguments for command '%s'.\n",
+				line->lineNumber, command->name);
+		line->hasError = True;
+	}
+	if (line->secondArgumentLoc == NULL)
+	{
+		printf("At line %d, missing second argument for command '%s'.\n",
+				line->lineNumber, command->name);
+		line->hasError = True;
+	}
+	if (line->thirdArgumentLoc != NULL)
+	{
+		printf("At line %d, Too many arguments given, expected 2.\n",
+				line->lineNumber);
+		line->hasError = True;
+	}
+}
+
+UserCommandResult genericTwoArgCommand(Line* line, const UserCommand* command, ProgramData* data)
+{
+	UserCommandResult result = nullInstruction();
+
+	validateTwoArgCommandArgNum(command, line);
+	if (line->hasError)
+		return result;
+
+	result = handleSourceOperand(data, line, command);
+	if (line->hasError)
+		return result;
+
+	result = handleDestOperand(data, line, command, result);
+
+	putCommandMetadata(&result, command);
+
+	if (isRegister(&result, SourceArg) && isRegister(&result, DestArg))
+	{
+		result.destArgBytes.bits |= result.sourceArgBytes.bits;
+		result.instructionSize = 2;
+	}
+	else
+		result.instructionSize = 3;
+
 	return result;
 }
 
@@ -98,6 +254,7 @@ UserCommandResult genericSingleArgCommand(Line* line, const UserCommand* command
 {
 	static char argument[MAX_LINE_SIZE];
 	Register* reg;
+	token argToken;
 	UserCommandResult result = nullInstruction();
 
 	if (line->firstArgumentLoc == NULL)
@@ -115,7 +272,12 @@ UserCommandResult genericSingleArgCommand(Line* line, const UserCommand* command
 		return result;
 	}
 
-	strtok_begin_cp(line->firstArgumentLoc, space_chars, argument);
+	argToken = strtok_begin_cp(line->firstArgumentLoc, space_chars, argument);
+
+	validateNoExcessCharsAfterArg(&argToken, line);
+
+	if (line->hasError)
+		return result;
 
 	if (isInstantAddressing(argument))
 	{
@@ -127,7 +289,7 @@ UserCommandResult genericSingleArgCommand(Line* line, const UserCommand* command
 			return result;
 		}
 
-		result = handleDestInstantAddressing(argument, line);
+		result = handleInstantAddressing(argument, line, DestArg);
 	}
 	else if (isRandomAddressing(argument) &&
 			 command->addressingTypes.destAddressingTypes.isRandomAllowed == False)
@@ -154,7 +316,7 @@ UserCommandResult genericSingleArgCommand(Line* line, const UserCommand* command
 		}
 
 		if (!data->inFirstRun)
-			result = handleDestDirectAddressing(argument, data, line);
+			handleDirectAddressing(argument, data, line, DestArg, &result);
 	}
 	else /* Invalid label name, error printed by validateLabelName_ */
 	{
@@ -396,11 +558,11 @@ UserCommandResult parseDataCommand(Line* line, const UserCommand* command, Progr
 	return empty;
 }
 
-
 UserCommandResult parseEntryCommand(Line* line, const UserCommand* command, ProgramData* data)
 {
 	static char referencedLabel[MAX_LINE_SIZE];
 	UserCommandResult result = nullInstruction();
+	token argToken;
 	const Symbol* existing;
 
 	if (line->hasLabel)
@@ -413,16 +575,24 @@ UserCommandResult parseEntryCommand(Line* line, const UserCommand* command, Prog
 
 	if (line->firstArgumentLoc != NULL)
 	{
-		strtok_begin_cp(line->firstArgumentLoc, space_chars, referencedLabel);
+		argToken = strtok_begin_cp(line->firstArgumentLoc, space_chars, referencedLabel);
+
+		validateNoExcessCharsAfterArg(&argToken, line);
+
+		if (line->hasError)
+			return result;
+
 		existing = lhash_find(&data->entries, referencedLabel);
 		/* new entry */
 		if (existing == NULL)
 		{
 			if (validateLabelName_(data, line, referencedLabel))
 				insertEntry(data, referencedLabel, line);
-			else
-				/* Invalid entry */
+			else /* Invalid entry */
+			{
 				line->hasError = True;
+				return result;
+			}
 		}
 		/* entry exists in first run is invalid */
 		else if (data->inFirstRun)
@@ -451,6 +621,7 @@ UserCommandResult parseExternCommand(Line* line, const UserCommand* command, Pro
 {
 	static char referencedLabel[MAX_LINE_SIZE];
 	UserCommandResult result = nullInstruction();
+	token labelToken;
 	const Symbol* existing;
 
 	if (line->hasLabel)
@@ -463,7 +634,13 @@ UserCommandResult parseExternCommand(Line* line, const UserCommand* command, Pro
 
 	if (line->firstArgumentLoc != NULL)
 	{
-		strtok_begin_cp(line->firstArgumentLoc, space_chars, referencedLabel);
+		labelToken = strtok_begin_cp(line->firstArgumentLoc, space_chars, referencedLabel);
+
+		validateNoExcessCharsAfterArg(&labelToken, line);
+
+		if (line->hasError)
+			return result;
+
 		existing = lhash_find(&data->symbols, referencedLabel);
 		/* new entry */
 		if (existing == NULL)
@@ -471,8 +648,11 @@ UserCommandResult parseExternCommand(Line* line, const UserCommand* command, Pro
 			if (validateLabelName_(data, line, referencedLabel))
 				insertExtern(data, referencedLabel, line);
 			else
+			{
 				/* Invalid entry */
 				line->hasError = True;
+				return result;
+			}
 		}
 		/* entry exists in first run is invalid */
 		else if (data->inFirstRun)

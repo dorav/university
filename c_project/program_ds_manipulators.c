@@ -177,6 +177,12 @@ ProgramData initCommandsTable()
 	insertCommand(&data, makePrnCommand());
 	insertCommand(&data, singleArgCommand("jsr", JsrOpcode));
 
+	/* TwoArgsCommands */
+
+	insertCommand(&data, twoArgCommand("mov", MovOpcode));
+	insertCommand(&data, twoArgCommand("add", AddOpcode));
+	insertCommand(&data, twoArgCommand("sub", SubOpcode));
+
 	return data;
 }
 

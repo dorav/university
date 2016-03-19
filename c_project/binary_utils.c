@@ -13,6 +13,9 @@
 #define DEST_METHOD_LOCATION 2
 #define DEST_METHOD_MASK (TWO_BITS_MASK << DEST_METHOD_LOCATION)
 
+#define SRC_METHOD_LOCATION 4
+#define SRC_METHOD_MASK (TWO_BITS_MASK << SRC_METHOD_LOCATION)
+
 #define GROUP_LOCATION 10
 #define GROUP_MASK (TWO_BITS_MASK << GROUP_LOCATION)
 
@@ -34,19 +37,42 @@ void putCommandMetadata(UserCommandResult* dest, const UserCommand* cmd)
 	SET_BITS_ON(dest->instructionBytes.bits, GROUP, cmd->group);
 }
 
-void putCommandDestAddrMethod(UserCommandResult* dest, AddressMethod method)
+void putCommandAddrMethod(UserCommandResult* dest, AddressMethod method, ArgType argType)
 {
-	SET_BITS_ON(dest->instructionBytes.bits, DEST_METHOD, method);
+	if (argType == DestArg)
+	{
+		SET_BITS_ON(dest->instructionBytes.bits, DEST_METHOD, method);
+	}
+	else
+		SET_BITS_ON(dest->instructionBytes.bits, SRC_METHOD, method);
 }
 
 #define DEST_REGISTER_LOCATION 2
 #define DEST_REGISTER_MASK (SIX_BITS_MASK << DEST_REGISTER_LOCATION)
 
+#define SRC_REGISTER_LOCATION 8
+#define SRC_REGISTER_MASK (SIX_BITS_MASK << SRC_REGISTER_LOCATION)
+
 void putDestRegister(UserCommandResult* dest, Register* reg)
 {
-	putCommandDestAddrMethod(dest, RegisterNameAddressing);
-	SET_BITS_ON(dest->firstArgBytes.bits, DEST_REGISTER, reg->number);
+	putCommandAddrMethod(dest, RegisterNameAddressing, DestArg);
+	SET_BITS_ON(dest->destArgBytes.bits, DEST_REGISTER, reg->number);
 }
+
+void putSrcRegister(UserCommandResult* dest, Register* reg)
+{
+	putCommandAddrMethod(dest, RegisterNameAddressing, SourceArg);
+	SET_BITS_ON(dest->sourceArgBytes.bits, SRC_REGISTER, reg->number);
+}
+
+boolean isRegister(UserCommandResult* result, ArgType argType)
+{
+	if (argType == SourceArg)
+		return ((SRC_METHOD_MASK) & result->instructionBytes.bits) == (RegisterNameAddressing << SRC_METHOD_LOCATION);
+
+	return ((DEST_METHOD_MASK) & result->instructionBytes.bits) == (RegisterNameAddressing << DEST_METHOD_LOCATION);
+}
+
 
 #define DIRECT_ADDRESSING_LOCATION 2
 #define DIRECT_ADDRESSING_MASK (TWELVE_BITS_MASK << DIRECT_ADDRESSING_LOCATION)
@@ -58,25 +84,33 @@ typedef enum
 	RelocatableAddressCoding = 2
 } AddressCodingType;
 
-void putDirectAddressLabel(UserCommandResult* dest, Symbol* label)
+void putDirectAddressLabel(UserCommandResult* dest, Symbol* label, ArgType argType)
 {
-	putCommandDestAddrMethod(dest, DirectAddressing);
+	CustomByte* byteToChange = argType == DestArg ? &dest->destArgBytes : &dest->sourceArgBytes;
+
+	putCommandAddrMethod(dest, DirectAddressing, argType);
 	if (label->isExternal)
-		SET_BITS_ON(dest->firstArgBytes.bits, ARE, ExternalAddressCoding)
+		SET_BITS_ON(byteToChange->bits, ARE, ExternalAddressCoding)
 	else
 	{
-		SET_BITS_ON(dest->firstArgBytes.bits, DIRECT_ADDRESSING, label->referencedMemAddr);
-		SET_BITS_ON(dest->firstArgBytes.bits, ARE, RelocatableAddressCoding);
+		SET_BITS_ON(byteToChange->bits, DIRECT_ADDRESSING, label->referencedMemAddr);
+		SET_BITS_ON(byteToChange->bits, ARE, RelocatableAddressCoding);
 	}
 }
 
 #define INSTANT_ADDRESSING_LOCATION 2
 #define INSTANT_ADDRESSING_MASK (THIRTEEN_BITS_MASK << INSTANT_ADDRESSING_LOCATION)
 
-void putInstantArgument(UserCommandResult* dest, int argument)
+void putInstantArgument(UserCommandResult* dest, int argument, ArgType argType)
 {
-	putCommandDestAddrMethod(dest, InstantAddressing);
-	SET_BITS_ON(dest->firstArgBytes.bits, INSTANT_ADDRESSING, argument);
+	CustomByte* argumentResult;
+
+	putCommandAddrMethod(dest, InstantAddressing, argType);
+	if (argType == DestArg)
+		argumentResult = &dest->destArgBytes;
+	else
+		argumentResult = &dest->sourceArgBytes;
+	SET_BITS_ON(argumentResult->bits, INSTANT_ADDRESSING, argument);
 }
 
 char to_32bit(unsigned int value)
@@ -138,11 +172,19 @@ void printByte(FILE* f, unsigned int address, CustomByte b)
 
 void printInstruction(FILE* f, const ProgramData* data, UserCommandResult i)
 {
+	int instructionCounter = data->instruction_counter;
 	if (i.instructionSize > 0)
-		printByte(f, data->instruction_counter, i.instructionBytes);
+		printByte(f, instructionCounter, i.instructionBytes);
+
+	if (i.instructionSize > 2)
+	{
+		printByte(f, instructionCounter + 1, i.sourceArgBytes);
+		instructionCounter++;
+	}
 
 	if (i.instructionSize > 1)
-		printByte(f, data->instruction_counter + 1, i.firstArgBytes);
+		printByte(f, instructionCounter + 1, i.destArgBytes);
+
 }
 
 void printCounterHeader(FILE* f, const ProgramData* data)

@@ -11,3 +11,8 @@ LABEL2: rts
 
 ; Can't define extern on existing label
 .extern LABEL2
+
+; Too many args
+.extern SOMETHING SOMETHING2
+.extern SOMETHING,SOMETHING
+.extern SOMETHING,

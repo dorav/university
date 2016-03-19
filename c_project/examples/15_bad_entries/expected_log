@@ -1,6 +1,6 @@
 At line 1, label name "2MAIN", cannot start with a non alphabetic character.
 At line 2, label name "MAIN_", cannot contain alpha-numeric character.
-At line 3, label name "MAIN_", cannot contain alpha-numeric character.
-At line 3, unexpected more then one argument 'MAIN_', entry instruction takes one argument.
-At line 6, expected label name for entry command, none found.
-At line 5, expected label 'NOPE', to be defined somewhere. Label never found.
+At line 3, Found non-space characters after last expected argument.
+At line 4, Found non-space characters after last expected argument.
+At line 7, expected label name for entry command, none found.
+At line 6, expected label 'NOPE', to be defined somewhere. Label never found.

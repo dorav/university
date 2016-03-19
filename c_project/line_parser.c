@@ -132,10 +132,11 @@ void interpolateParsedData(Line* line, token token)
 	token = strtok_next(token, space_chars);
 	line->firstArgumentLoc = token.start;
 
-	token = strtok_next(token, space_chars);
-	line->secondArgumentLoc = token.start;
+	token = strtok_begin(line->firstArgumentLoc, ",");
+	token = strtok_next(token, ",");
+	line->secondArgumentLoc = strtok_begin(token.start, space_chars).start; /* trimming spaces */
 
-	token = strtok_next(token, space_chars);
+	token = strtok_next(token, ",");
 	line->thirdArgumentLoc = token.start;
 }
 

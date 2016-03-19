@@ -1,0 +1,13 @@
+At line 1, label name "123", cannot start with a non alphabetic character.
+At line 2, label name "123", cannot start with a non alphabetic character.
+At line 3, label name "123", cannot start with a non alphabetic character.
+At line 5, destination instant addressing ('#123') is not allowed for instruction of type 'mov'.
+At line 6, destination instant addressing ('#123') is not allowed for instruction of type 'mov'.
+At line 7, destination instant addressing ('#123') is not allowed for instruction of type 'mov'.
+At line 9, missing second argument for command 'mov'.
+At line 10, missing second argument for command 'mov'.
+At line 11, missing second argument for command 'mov'.
+At line 12, missing second argument for command 'mov'.
+At line 13, missing second argument for command 'mov'.
+At line 19, Too many arguments given, expected 2.
+At line 20, Too many arguments given, expected 2.

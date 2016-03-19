@@ -20,6 +20,21 @@ AllowedAddressings genericSingleArgCommandRestrictions()
 	return allowed;
 }
 
+AllowedAddressings genericTwoArgCommandRestrictions()
+{
+	AllowedAddressings allowed = { 0 };
+
+	allowed.destAddressingTypes.isRegisterAllowed = True;
+	allowed.destAddressingTypes.isDirectAllowed = True;
+
+	allowed.sourceAddressingTypes.isDirectAllowed = True;
+	allowed.sourceAddressingTypes.isRegisterAllowed= True;
+	allowed.sourceAddressingTypes.isRandomAllowed = True;
+	allowed.sourceAddressingTypes.isInstantAllowed = True;
+
+	return allowed;
+}
+
 UserCommand makeEntryCommand()
 {
 	UserCommand u;
@@ -95,6 +110,19 @@ UserCommand singleArgCommand(const char* name, CommandOpcode opcode)
 	u.group = SingleArgGroup;
 	u.handler = genericSingleArgCommand;
 	u.addressingTypes = genericSingleArgCommandRestrictions();
+	strcpy(u.name, name);
+
+	return u;
+}
+
+UserCommand twoArgCommand(const char* name, CommandOpcode opcode)
+{
+	UserCommand u;
+
+	u.opcode = opcode;
+	u.group = TwoArgsGroup;
+	u.handler = genericTwoArgCommand;
+	u.addressingTypes = genericTwoArgCommandRestrictions();
 	strcpy(u.name, name);
 
 	return u;

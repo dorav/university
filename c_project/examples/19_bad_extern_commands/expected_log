@@ -4,3 +4,6 @@ At line 6, label name "3ABC", cannot start with a non alphabetic character.
 At line 7, label name "#abc", cannot start with a non alphabetic character.
 At line 8, label name "ThisNameIsGoingToBeWayTooLongForAnyOneToBotherToRead", cannot be more then 30 chars long.
 At line 13, extern 'LABEL2' defined twice, previous definition at 10.
+At line 16, Found non-space characters after last expected argument.
+At line 17, label name "SOMETHING,SOMETHING", cannot contain alpha-numeric character.
+At line 18, label name "SOMETHING,", cannot contain alpha-numeric character.

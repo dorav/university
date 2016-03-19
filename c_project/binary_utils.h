@@ -15,10 +15,19 @@ int decimal_data_lower_bound();
 #define INSTANT_ADDRESSING_UPPER_BOUND 4095
 #define INSTANT_ADDRESSING_LOWER_BOUND -4096
 
+typedef enum
+{
+	SourceArg,
+	DestArg
+} ArgType;
+
 void putCommandMetadata(UserCommandResult* dest, const UserCommand* cmd);
 void putDestRegister(UserCommandResult* dest, Register* reg);
-void putDirectAddressLabel(UserCommandResult* dest, Symbol* label);
-void putInstantArgument(UserCommandResult* dest, int argument);
+void putSrcRegister(UserCommandResult* dest, Register* reg);
+void putDirectAddressLabel(UserCommandResult* dest, Symbol* label, ArgType argType);
+void putInstantArgument(UserCommandResult* dest, int argument, ArgType argType);
+
+boolean isRegister(UserCommandResult* result, ArgType argType);
 
 CustomByte getDataStorageNumber(int number);
 

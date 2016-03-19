@@ -1,0 +1,4 @@
+At line 1, too many arguments after command 'clr', expected one.
+At line 2, Found non-space characters after last expected argument.
+At line 3, too many arguments after command 'clr', expected one.
+At line 4, label name "abc,", cannot contain alpha-numeric character.

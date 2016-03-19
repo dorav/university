@@ -46,6 +46,9 @@ void advance_token_to_next_delimiter(token* tok, const char* delimiters)
 
 void skip_sticky_delimiters(token* t, const char* delimiters)
 {
+	if (t->start == NULL)
+		return;
+
 	/* Skipping all prefix delimiters */
 	while(*t->start != '\0' && isDelimiter(*t->start, delimiters))
 		t->start++;

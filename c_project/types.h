@@ -15,6 +15,11 @@ typedef enum
 {
 	InvalidOpcode = -1,
 
+	/* Two args commands */
+	MovOpcode = 0,
+	AddOpcode = 2,
+	SubOpcode = 3,
+
 	/* Single args commands */
 	NotOpcode = 4,
 	ClrOpcode = 5,
@@ -47,8 +52,8 @@ typedef struct
 typedef struct
 {
 	CustomByte instructionBytes;
-	CustomByte firstArgBytes;
-	CustomByte secondArgBytes;
+	CustomByte sourceArgBytes;
+	CustomByte destArgBytes;
 	unsigned int instructionSize;
 } UserCommandResult;
 
