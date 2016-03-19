@@ -160,6 +160,7 @@ ProgramData initCommandsTable()
 	insertCommand(&data, makeEntryCommand());
 	insertCommand(&data, makeExternCommand());
 	insertCommand(&data, makeDataCommand());
+	insertCommand(&data, makeStringCommand());
 
 	/* No args commands */
 	insertCommand(&data, makeStopCommand());

@@ -53,6 +53,17 @@ UserCommand makeDataCommand()
 	return u;
 }
 
+UserCommand makeStringCommand()
+{
+	UserCommand u;
+	u.opcode = InvalidOpcode;
+	u.group = SpecialGroup;
+	u.handler = parseStringCommand;
+	u.addressingTypes = addressingIsIrrelevant,
+	strcpy(u.name, ".string");
+	return u;
+}
+
 
 UserCommand makeRtsCommand()
 {

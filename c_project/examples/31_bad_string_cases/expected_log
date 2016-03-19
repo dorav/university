@@ -1,0 +1,5 @@
+At line 1, missing argument for command '.string'.
+At line 2, argument '"', for ".string" command must be quoted (missing closing quote).
+At line 3, argument 'a', for ".string" command must be quoted (missing opening quote).
+At line 4, while parsing '.string' command, did not expect more characters after string definition.
+At line 5, while parsing '.string' command, did not expect more characters after string definition.

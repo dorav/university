@@ -250,6 +250,95 @@ void addDataStorage(ProgramData* data, CustomByte toAdd)
 	data->data_counter++;
 }
 
+void addStringStorage(ProgramData* data, token toAdd)
+{
+	static char stringToAdd[MAX_LINE_SIZE];
+	int i = -1;
+	CustomByte byte;
+
+	copy_token(&toAdd, stringToAdd);
+
+	do
+	{
+		++i;
+		byte.bits = stringToAdd[i];
+		addDataStorage(data, byte);
+	}
+	while (stringToAdd[i] != '\0');
+}
+
+const char* findEndOfString(const char* arg)
+{
+	/* arg[0] is '"' */
+	while(arg[1] != '"')
+	{
+		if (arg[1] == '\0')
+			return NULL;
+		++arg;
+	}
+
+	return arg;
+}
+
+UserCommandResult parseStringCommand(Line* line, const UserCommand* command, ProgramData* data)
+{
+	static char newLineDelimiter[] = { '\n', '\0' };
+	static char argument[MAX_LINE_SIZE];
+	const char* endOfString;
+	token stringToAdd;
+
+	UserCommandResult empty = nullInstruction();
+
+	if (line->firstArgumentLoc == NULL)
+	{
+		printf("At line %d, missing argument for command '%s'.\n", line->lineNumber, command->name);
+		line->hasError = True;
+		return empty;
+	}
+
+	if (line->hasLabel && data->inFirstRun)
+	{
+		line->label->isDataLabel = True;
+		line->label->referencedMemAddr = data->data_counter;
+	}
+
+	strtok_begin_cp(line->firstArgumentLoc, newLineDelimiter, argument);
+
+	if (argument[0] != '"')
+	{
+		printf("At line %d, argument '%s', for \"%s\" command must be quoted (missing opening quote).\n",
+				line->lineNumber, argument, command->name);
+		line->hasError = True;
+		return empty;
+	}
+
+	endOfString = findEndOfString(argument);
+
+	if (endOfString == NULL)
+	{
+		printf("At line %d, argument '%s', for \"%s\" command must be quoted (missing closing quote).\n",
+					line->lineNumber, argument, command->name);
+				line->hasError = True;
+		return empty;
+	}
+
+	/* having a '"' followed by another non-space char is invalid */
+	if (!isSpaces(endOfString + 2))
+	{
+		printf("At line %d, while parsing '%s' command, did not expect more characters after string definition.\n",
+				line->lineNumber, command->name);
+		line->hasError = True;
+		return empty;
+	}
+
+	stringToAdd.start = argument + 1;
+	stringToAdd.end = endOfString;
+
+	addStringStorage(data, stringToAdd);
+
+	return empty;
+}
+
 UserCommandResult parseDataCommand(Line* line, const UserCommand* command, ProgramData* data)
 {
 	static char argument[MAX_LINE_SIZE];
@@ -257,8 +346,6 @@ UserCommandResult parseDataCommand(Line* line, const UserCommand* command, Progr
 	int number = 0;
 
 	UserCommandResult empty = nullInstruction();
-
-	UNUSED(data);
 
 	if (line->firstArgumentLoc == NULL)
 	{
@@ -309,6 +396,7 @@ UserCommandResult parseDataCommand(Line* line, const UserCommand* command, Progr
 	return empty;
 }
 
+
 UserCommandResult parseEntryCommand(Line* line, const UserCommand* command, ProgramData* data)
 {
 	static char referencedLabel[MAX_LINE_SIZE];
@@ -356,7 +444,6 @@ UserCommandResult parseEntryCommand(Line* line, const UserCommand* command, Prog
 		line->hasError = True;
 	}
 
-	UNUSED(command);
 	return result;
 }
 
