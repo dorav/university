@@ -107,7 +107,7 @@ void handleInstantAddressing(const char* argument, Line* line, ArgType argType, 
 		putInstantArgument(result, number, argType);
 }
 
-#ifdef __DEBUG__
+#ifdef __DEBUG_
 
 int rand_range(int min_n, int max_n)
 {
@@ -169,7 +169,7 @@ const char* handleRandomAddressing(ProgramData* data, const char* argument, User
 
 	if (strcmp("*", argument) == 0)
 	{
-		temp = rand_range(0, NUM_OF_GENERAL_REGISTERS);
+		temp = rand_range(0, NUM_OF_GENERAL_REGISTERS - 1);
 		sprintf(randomedArgument, "r%d", temp);
 
 		putRndBits(result, RandomRegister);
