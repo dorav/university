@@ -11,6 +11,8 @@
 #include <stdio.h>
 #include <string.h>
 #include "stdlib.h"
+
+#include "assembler_specific_utilities.h"
 #include "binary_utils.h"
 #include "program_ds_manipulators.h"
 #include "line_parser.h"
@@ -131,11 +133,15 @@ Symbol* getRandomSymbol(ProgramData* data)
 	Symbol* current;
 	Symbol* lastGood = NULL;
 
-	for (i = lhash_begin(&data->symbols); i.isValid && randomNumber > 0; lhash_set_next(&i), randomNumber--)
+	/* Definitly not uniform distribution.. but good enough */
+	for (i = lhash_begin(&data->symbols); i.isValid && (randomNumber > 0 || lastGood == NULL) ; lhash_set_next(&i))
 	{
 		current = (Symbol*) i.current->data;
 		if (current->isExternal == False)
+		{
 			lastGood = current;
+			randomNumber--;
+		}
 	}
 
 	return lastGood;
@@ -179,12 +185,14 @@ const char* handleRandomAddressing(ProgramData* data, const char* argument, User
 	}
 	else if (strcmp("***", argument) == 0)
 	{
-		label = getRandomSymbol(data);
-		if (label == NULL)
+		if (data->inFirstRun && numOfLabels(data) == 0)
 		{
 			lhash_insert(&data->randomLabelLines, &line->lineNumber, newInt(line->lineNumber));
 			return "PlaceHolderUnresolvedRandom";
 		}
+
+		label = getRandomSymbol(data);
+
 		sprintf(randomedArgument, "%s", label->name);
 
 		putRndBits(result, RandomLabel);
@@ -247,10 +255,7 @@ UserCommandResult handleSourceOperand(ProgramData* data, Line* line, const UserC
 			handleDirectAddressing(argument, data, line, SourceArg, &result);
 	}
 	else
-	{
 		line->hasError = True;
-	}
-
 
 	return result;
 }

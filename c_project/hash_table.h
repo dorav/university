@@ -43,6 +43,8 @@ OHashTable newOHashTable(ObjectMetadata objectMetadata);
 boolean ohash_insert(OHashTable* table, const void* key, void* object);
 const void* ohash_find(OHashTable* table, const void* key);
 
+void ohash_free(OHashTable* table);
+
 typedef OHashTable LHashTable;
 
 LHashTable newLHashTable(ObjectMetadata objectMetadata, unsigned int tableSize);
@@ -66,5 +68,7 @@ typedef struct
 lhash_iter lhash_begin(LHashTable* table);
 lhash_iter lhash_end();
 void lhash_set_next(lhash_iter* current);
+
+void lhash_free(LHashTable* table);
 
 #endif /* HASH_TABLE_H_ */

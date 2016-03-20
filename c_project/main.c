@@ -10,6 +10,7 @@
 #include <string.h>
 #include <time.h>
 
+#include "assembler_specific_utilities.h"
 #include "binary_utils.h"
 #include "types.h"
 #include "hash_table.h"
@@ -19,10 +20,16 @@
 
 boolean shouldParse(Line* line)
 {
-	/* Could be combined to a single if, but it's easier to debug this */
-	if (line->data[0] == ';')
+	const char* data = line->data;
+
+	if (isSpaces(data))
 		return False;
-	else if (isSpaces(line->data))
+
+	while (isspace(*data))
+		data++;
+
+	/* Could be combined to a single if, but it's easier to debug this */
+	if (data[0] == ';')
 		return False;
 
 	return True;
@@ -200,7 +207,7 @@ void printUnresolvedRandomLabels(ProgramData* data)
 	for (i = lhash_begin(&data->randomLabelLines); i.isValid; lhash_set_next(&i))
 		printf("At line %d, Requested random label, but no labels were found.\n", *(int*) i.current->data);
 
-	/* TODO: empty the randomLabelLines table */
+	lhash_free(&data->randomLabelLines);
 }
 
 void validateUnresolvedSymbols(ProgramData* data)
@@ -208,14 +215,7 @@ void validateUnresolvedSymbols(ProgramData* data)
 	lhash_iter i;
 	Symbol* current;
 	Symbol* referencedLabel;
-	int numberOfInternalSymbols = 0;
-
-	for (i = lhash_begin(&data->symbols); i.isValid; lhash_set_next(&i))
-	{
-		current = (Symbol*) i.current->data;
-		if (!current->isExternal)
-			numberOfInternalSymbols++;
-	}
+	int numberOfInternalSymbols = numOfLabels(data);
 
 	/* Has unresolved random address labels */
 	if (numberOfInternalSymbols == 0 && data->randomLabelLines.numberOfUsed > 0)
@@ -236,7 +236,7 @@ void validateUnresolvedSymbols(ProgramData* data)
 		}
 	}
 
-	/* TODO: empty the unresolved table */
+	lhash_free(&data->unresolvedSymbols);
 }
 
 
@@ -309,6 +309,11 @@ int main(int argc, char** argv)
 			writeEntriesFile(&data, data.inputFileName);
 	}
 
+	lhash_free(&data.symbols);
+	lhash_free(&data.registers);
+	lhash_free(&data.entries);
+	ohash_free(&data.cmds);
+	free(data.dataStorage);
 	fclose(status);
 	fclose(inputFile);
 

@@ -250,3 +250,39 @@ void lhash_set_next(lhash_iter* current)
 	if (current->current == NULL)
 		find_next_bucket(current, current->index + 1);
 }
+
+void free_list(struct LTableNode* list)
+{
+	struct LTableNode* next;
+
+	while (list != NULL)
+	{
+		free(list->data);
+		next = list->next;
+		free(list);
+		list = next;
+	}
+}
+
+void ohash_free(OHashTable* table)
+{
+	free(table->objects);
+}
+
+void lhash_free(LHashTable* table)
+{
+	unsigned int i;
+	struct LTableNode* current;
+
+	for (i = 0u; i < table->tableSize; ++i)
+	{
+		current = &((struct LTableNode*)table->objects)[i];
+		if (current->data != NULL)
+		{
+			free(current->data);
+			free_list(current->next);
+		}
+	}
+
+	free(table->objects);
+}

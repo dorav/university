@@ -100,17 +100,18 @@ boolean registerNameCmp(const KeyType key, const ObjectType object)
 
 void insertGeneralRegisters(ProgramData* data)
 {
-	static Register generals[NUM_OF_GENERAL_REGISTERS];
 	int i;
+	Register* reg;
 
 	for (i = 0; i < NUM_OF_GENERAL_REGISTERS; ++i)
 	{
-		generals[i].name[0] = 'r';
-		generals[i].name[1] = i + '0';
-		generals[i].name[2] = '\0';
-		generals[i].number = i;
+		reg = calloc(1, sizeof(Register));
+		reg->name[0] = 'r';
+		reg->name[1] = i + '0';
+		reg->name[2] = '\0';
+		reg->number = i;
 
-		lhash_insert(&data->registers, generals[i].name, &generals[i]);
+		lhash_insert(&data->registers, reg->name, reg);
 	}
 }
 
