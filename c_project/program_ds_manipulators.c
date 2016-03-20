@@ -98,27 +98,6 @@ boolean registerNameCmp(const KeyType key, const ObjectType object)
 	return strcmp((const char*)key, ((const Register*)object)->name) == 0;
 }
 
-void insertPCRegister(ProgramData* data)
-{
-	static Register r;
-	strcpy(r.name, "PC");
-	lhash_insert(&data->registers, r.name, &r);
-}
-
-void insertSPRegister(ProgramData* data)
-{
-	static Register r;
-	strcpy(r.name, "SP");
-	lhash_insert(&data->registers, r.name, &r);
-}
-
-void insertPSWRegister(ProgramData* data)
-{
-	static Register r;
-	strcpy(r.name, "PSW");
-	lhash_insert(&data->registers, r.name, &r);
-}
-
 #define NUM_OF_GENERAL_REGISTERS 8
 
 void insertGeneralRegisters(ProgramData* data)
@@ -193,9 +172,6 @@ void initRegisters(ProgramData* data)
 	data->registers = newLHashTable(meta, 1);
 
 	insertGeneralRegisters(data);
-	insertPSWRegister(data);
-	insertPCRegister(data);
-	insertSPRegister(data);
 }
 
 void initEntries(ProgramData* data)
