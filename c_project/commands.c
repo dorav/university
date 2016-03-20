@@ -97,16 +97,12 @@ int extractNumberArg(const char* argument, Line* line)
 	return number;
 }
 
-UserCommandResult handleInstantAddressing(const char* argument, Line* line, ArgType argType)
+void handleInstantAddressing(const char* argument, Line* line, ArgType argType, UserCommandResult* result)
 {
-	UserCommandResult result = nullInstruction();
 	int number = extractNumberArg(argument, line);
 
-	if (line->hasError)
-		return result;
-
-	putInstantArgument(&result, number, argType);
-	return result;
+	if (!line->hasError)
+		putInstantArgument(result, number, argType);
 }
 
 UserCommandResult handleSourceOperand(ProgramData* data, Line* line, const UserCommand* command)
@@ -129,7 +125,7 @@ UserCommandResult handleSourceOperand(ProgramData* data, Line* line, const UserC
 			return result;
 		}
 
-		result = handleInstantAddressing(argument, line, SourceArg);
+		handleInstantAddressing(argument, line, SourceArg, &result);
 	}
 	else if ((reg = referencedRegister(data, argument)) != NULL &&
 			 command->addressingTypes.sourceAddressingTypes.isRegisterAllowed)
@@ -176,7 +172,7 @@ UserCommandResult handleDestOperand(ProgramData* data, Line* line, const UserCom
 			return result;
 		}
 
-		result = handleInstantAddressing(argument, line, SourceArg);
+		handleInstantAddressing(argument, line, DestArg, &result);
 	}
 	else if ((reg = referencedRegister(data, argument)) != NULL &&
 			 command->addressingTypes.destAddressingTypes.isRegisterAllowed)
@@ -289,7 +285,7 @@ UserCommandResult genericSingleArgCommand(Line* line, const UserCommand* command
 			return result;
 		}
 
-		result = handleInstantAddressing(argument, line, DestArg);
+		handleInstantAddressing(argument, line, DestArg, &result);
 	}
 	else if (isRandomAddressing(argument) &&
 			 command->addressingTypes.destAddressingTypes.isRandomAllowed == False)

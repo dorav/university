@@ -128,6 +128,13 @@ UserCommand twoArgCommand(const char* name, CommandOpcode opcode)
 	return u;
 }
 
+UserCommand makeCmpCommand()
+{
+	UserCommand prn = twoArgCommand("cmp", CmpOpcode);
+	prn.addressingTypes.destAddressingTypes.isInstantAllowed = True;
+	return prn;
+}
+
 UserCommand makeNotCommand()
 {
 	UserCommand u = singleArgCommand("not", NotOpcode);

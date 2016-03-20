@@ -161,6 +161,7 @@ ProgramData initCommandsTable()
 	insertCommand(&data, twoArgCommand("mov", MovOpcode));
 	insertCommand(&data, twoArgCommand("add", AddOpcode));
 	insertCommand(&data, twoArgCommand("sub", SubOpcode));
+	insertCommand(&data, makeCmpCommand());
 
 	return data;
 }

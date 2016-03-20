@@ -17,6 +17,7 @@ typedef enum
 
 	/* Two args commands */
 	MovOpcode = 0,
+	CmpOpcode = 1,
 	AddOpcode = 2,
 	SubOpcode = 3,
 
