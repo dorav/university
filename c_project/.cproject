@@ -36,6 +36,9 @@
 								<option id="gnu.c.compiler.option.warnings.pedantic.error.847856056" name="Pedantic warnings as errors (-pedantic-errors)" superClass="gnu.c.compiler.option.warnings.pedantic.error" value="true" valueType="boolean"/>
 								<option id="gnu.c.compiler.option.warnings.pedantic.1823552897" name="Pedantic (-pedantic)" superClass="gnu.c.compiler.option.warnings.pedantic" value="true" valueType="boolean"/>
 								<option id="gnu.c.compiler.option.misc.ansi.1889647027" name="Support ANSI programs (-ansi)" superClass="gnu.c.compiler.option.misc.ansi" value="true" valueType="boolean"/>
+								<option id="gnu.c.compiler.option.preprocessor.def.symbols.1554270093" superClass="gnu.c.compiler.option.preprocessor.def.symbols" valueType="definedSymbols">
+									<listOptionValue builtIn="false" value="__DEBUG__"/>
+								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.c.compiler.input.cygwin.1139182610" superClass="cdt.managedbuild.tool.gnu.c.compiler.input.cygwin"/>
 							</tool>
 							<tool id="cdt.managedbuild.tool.gnu.c.linker.cygwin.exe.debug.576280042" name="Cygwin C Linker" superClass="cdt.managedbuild.tool.gnu.c.linker.cygwin.exe.debug">

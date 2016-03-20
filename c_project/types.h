@@ -45,6 +45,13 @@ typedef enum
 	RegisterNameAddressing = 3
 } AddressMethod;
 
+typedef enum
+{
+	RandomRegister = 1,
+	RandomInstant = 2,
+	RandomLabel = 3
+} RandomType;
+
 typedef struct
 {
 	unsigned int bits : 15;
@@ -100,7 +107,7 @@ typedef struct
 	LHashTable registers;
 	LHashTable entries;
 	LHashTable unresolvedSymbols;
-
+	LHashTable randomLabelLines;
 
 	const char* inputFileName;
 	FILE* externalReferencesFile;
@@ -144,6 +151,8 @@ struct UserCommand
 };
 
 typedef struct UserCommand UserCommand;
+
+#define NUM_OF_GENERAL_REGISTERS 8
 
 typedef struct
 {

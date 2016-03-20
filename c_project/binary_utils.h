@@ -22,11 +22,14 @@ typedef enum
 } ArgType;
 
 void putCommandMetadata(UserCommandResult* dest, const UserCommand* cmd);
+void putCommandAddrMethod(UserCommandResult* dest, AddressMethod method, ArgType argType);
 void putDestRegister(UserCommandResult* dest, Register* reg);
 void putSrcRegister(UserCommandResult* dest, Register* reg);
 void putDirectAddressLabel(UserCommandResult* dest, Symbol* label, ArgType argType);
 void putInstantArgument(UserCommandResult* dest, int argument, ArgType argType);
+void putRndBits(UserCommandResult* dest, RandomType rnd);
 
+boolean hasRandomAddressing(UserCommandResult* result);
 boolean isRegister(UserCommandResult* result, ArgType argType);
 
 CustomByte getDataStorageNumber(int number);

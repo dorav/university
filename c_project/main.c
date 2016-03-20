@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "binary_utils.h"
 #include "types.h"
@@ -44,7 +45,7 @@ void printUsage(char* programName)
 void validateNumberOfArguments(int argc, char* argv[])
 {
 	int realArgIndex = argc - FIRST_ARG_INDEX;
-	if (realArgIndex != FILE_NAME_ARG_INDEX)
+	if (realArgIndex < FILE_NAME_ARG_INDEX)
 	{
 		printf("Bad usage - no arguments given\n");
 		USAGE;
@@ -96,7 +97,6 @@ void prepareDataFor2ndRun(ProgramData* data)
 {
 	lhash_iter i;
 	Symbol* current;
-
 
 	for (i = lhash_begin(&data->symbols); i.isValid; lhash_set_next(&i))
 	{
@@ -193,20 +193,45 @@ void validateEntries(ProgramData* data)
 	}
 }
 
+void printUnresolvedRandomLabels(ProgramData* data)
+{
+	lhash_iter i;
+
+	for (i = lhash_begin(&data->randomLabelLines); i.isValid; lhash_set_next(&i))
+		printf("At line %d, Requested random label, but no labels were found.\n", *(int*) i.current->data);
+
+	/* TODO: empty the randomLabelLines table */
+}
+
 void validateUnresolvedSymbols(ProgramData* data)
 {
 	lhash_iter i;
-	Symbol* entry;
+	Symbol* current;
 	Symbol* referencedLabel;
+	int numberOfInternalSymbols = 0;
+
+	for (i = lhash_begin(&data->symbols); i.isValid; lhash_set_next(&i))
+	{
+		current = (Symbol*) i.current->data;
+		if (!current->isExternal)
+			numberOfInternalSymbols++;
+	}
+
+	/* Has unresolved random address labels */
+	if (numberOfInternalSymbols == 0 && data->randomLabelLines.numberOfUsed > 0)
+	{
+		printUnresolvedRandomLabels(data);
+		data->numberOfErrors++;
+	}
 
 	for (i = lhash_begin(&data->unresolvedSymbols); i.isValid; lhash_set_next(&i))
 	{
-		entry = (Symbol*) i.current->data;
-		referencedLabel  = lhash_find(&data->symbols, entry->name);
+		current = (Symbol*) i.current->data;
+		referencedLabel  = lhash_find(&data->symbols, current->name);
 		if (referencedLabel == NULL)
 		{
 			printf("At line %d, expected label '%s', to be defined somewhere. Label never found.\n",
-					entry->lineNumber, entry->name);
+					current->lineNumber, current->name);
 			data->numberOfErrors++;
 		}
 	}
@@ -245,6 +270,7 @@ int main(int argc, char** argv)
 	if (status == NULL)
 		puts("Bad redirect");
 
+	srand(time(NULL));
 
 	validateNumberOfArguments(argc, argv);
 

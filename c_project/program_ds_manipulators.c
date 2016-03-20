@@ -98,8 +98,6 @@ boolean registerNameCmp(const KeyType key, const ObjectType object)
 	return strcmp((const char*)key, ((const Register*)object)->name) == 0;
 }
 
-#define NUM_OF_GENERAL_REGISTERS 8
-
 void insertGeneralRegisters(ProgramData* data)
 {
 	static Register generals[NUM_OF_GENERAL_REGISTERS];
@@ -189,6 +187,18 @@ void initUnresolvedSymbols(ProgramData* data)
 	data->unresolvedSymbols = newLHashTable(meta, 1);
 }
 
+boolean intComparer(const KeyType key, const ObjectType object)
+{
+	return *(const int*)key == *(const int*)object;
+}
+
+void initRandomLabelLines(ProgramData* data)
+{
+	ObjectMetadata meta = { stupidhash, intComparer, sizeof(int) };
+
+	data->randomLabelLines = newLHashTable(meta, 1);
+}
+
 ProgramData initProgramData(const char* inputFileName)
 {
 	ProgramData data = initCommandsTable(&data);
@@ -196,6 +206,7 @@ ProgramData initProgramData(const char* inputFileName)
 	initRegisters(&data);
 	initEntries(&data);
 	initUnresolvedSymbols(&data);
+	initRandomLabelLines(&data);
 
 	data.inputFileName = inputFileName;
 

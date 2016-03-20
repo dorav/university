@@ -1,0 +1,3 @@
+At line 1, label name "****", cannot start with a non alphabetic character.
+At line 2, label name "***a", cannot start with a non alphabetic character.
+At line 3, label name "***1", cannot start with a non alphabetic character.

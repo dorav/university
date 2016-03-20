@@ -2,22 +2,24 @@
 
 #include <stdlib.h>
 #define THIRTEEN_BITS_MASK 0x1FFF
-#define TWELVE_BITS_MASK 0xFFF
 #define SIX_BITS_MASK 0x3F
 #define FOUR_BITS_MASK 0xF
 #define TWO_BITS_MASK 0x3
 
+#define RND_TYPE_LOCATION 12
+#define RND_TYPE_MASK (TWO_BITS_MASK << RND_TYPE_LOCATION)
+
+#define GROUP_LOCATION 10
+#define GROUP_MASK (TWO_BITS_MASK << GROUP_LOCATION)
+
 #define OPCODE_LOCATION 6
 #define OPCODE_MASK (FOUR_BITS_MASK << OPCODE_LOCATION)
-
-#define DEST_METHOD_LOCATION 2
-#define DEST_METHOD_MASK (TWO_BITS_MASK << DEST_METHOD_LOCATION)
 
 #define SRC_METHOD_LOCATION 4
 #define SRC_METHOD_MASK (TWO_BITS_MASK << SRC_METHOD_LOCATION)
 
-#define GROUP_LOCATION 10
-#define GROUP_MASK (TWO_BITS_MASK << GROUP_LOCATION)
+#define DEST_METHOD_LOCATION 2
+#define DEST_METHOD_MASK (TWO_BITS_MASK << DEST_METHOD_LOCATION)
 
 #define ARE_LOCATION 0
 #define ARE_MASK (TWO_BITS_MASK << ARE_LOCATION)
@@ -65,6 +67,11 @@ void putSrcRegister(UserCommandResult* dest, Register* reg)
 	SET_BITS_ON(dest->sourceArgBytes.bits, SRC_REGISTER, reg->number);
 }
 
+boolean hasRandomAddressing(UserCommandResult* result)
+{
+	return ((RND_TYPE_MASK) & result->instructionBytes.bits) != 0;
+}
+
 boolean isRegister(UserCommandResult* result, ArgType argType)
 {
 	if (argType == SourceArg)
@@ -73,9 +80,8 @@ boolean isRegister(UserCommandResult* result, ArgType argType)
 	return ((DEST_METHOD_MASK) & result->instructionBytes.bits) == (RegisterNameAddressing << DEST_METHOD_LOCATION);
 }
 
-
 #define DIRECT_ADDRESSING_LOCATION 2
-#define DIRECT_ADDRESSING_MASK (TWELVE_BITS_MASK << DIRECT_ADDRESSING_LOCATION)
+#define DIRECT_ADDRESSING_MASK (THIRTEEN_BITS_MASK << DIRECT_ADDRESSING_LOCATION)
 
 typedef enum
 {
@@ -111,6 +117,11 @@ void putInstantArgument(UserCommandResult* dest, int argument, ArgType argType)
 	else
 		argumentResult = &dest->sourceArgBytes;
 	SET_BITS_ON(argumentResult->bits, INSTANT_ADDRESSING, argument);
+}
+
+void putRndBits(UserCommandResult* dest, RandomType rnd)
+{
+	SET_BITS_ON(dest->instructionBytes.bits, RND_TYPE, rnd);
 }
 
 char to_32bit(unsigned int value)

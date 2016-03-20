@@ -105,15 +105,114 @@ void handleInstantAddressing(const char* argument, Line* line, ArgType argType, 
 		putInstantArgument(result, number, argType);
 }
 
+#ifdef __DEBUG__
+
+int rand_range(int min_n, int max_n)
+{
+	UNUSED(min_n);
+	UNUSED(max_n);
+	/* Best random ever */
+    return 3;
+}
+
+#else
+
+int rand_range(int min_n, int max_n)
+{
+    return rand() % (max_n - min_n + 1) + min_n;
+}
+
+#endif
+
+Symbol* getRandomSymbol(ProgramData* data)
+{
+	int randomNumber = rand_range(0, data->symbols.numberOfUsed - 1);
+	lhash_iter i;
+	Symbol* current;
+	Symbol* lastGood = NULL;
+
+	for (i = lhash_begin(&data->symbols); i.isValid && randomNumber > 0; lhash_set_next(&i), randomNumber--)
+	{
+		current = (Symbol*) i.current->data;
+		if (current->isExternal == False)
+			lastGood = current;
+	}
+
+	return lastGood;
+}
+
+int* newInt(int num)
+{
+	int* ret = malloc(sizeof(int));
+
+	if (ret == NULL)
+	{
+		printf("Internal error while allocating memory, can't allocate for unresolved random label.\n");
+		exit(AllocationFailure);
+	}
+
+	*ret = num;
+	return ret;
+}
+
+const char* handleRandomAddressing(ProgramData* data, const char* argument, UserCommandResult* result, Line* line)
+{
+	static char randomedArgument[10];
+	Symbol* label;
+	int temp;
+
+	if (strcmp("*", argument) == 0)
+	{
+		temp = rand_range(0, NUM_OF_GENERAL_REGISTERS);
+		sprintf(randomedArgument, "r%d", temp);
+
+		putRndBits(result, RandomRegister);
+		return randomedArgument;
+	}
+	else if (strcmp("**", argument) == 0)
+	{
+		temp = rand_range(INSTANT_ADDRESSING_LOWER_BOUND, INSTANT_ADDRESSING_UPPER_BOUND);
+		sprintf(randomedArgument, "#%d", temp);
+
+		putRndBits(result, RandomInstant);
+		return randomedArgument;
+	}
+	else if (strcmp("***", argument) == 0)
+	{
+		label = getRandomSymbol(data);
+		if (label == NULL)
+		{
+			lhash_insert(&data->randomLabelLines, &line->lineNumber, newInt(line->lineNumber));
+			return "PlaceHolderUnresolvedRandom";
+		}
+		sprintf(randomedArgument, "%s", label->name);
+
+		putRndBits(result, RandomLabel);
+		return randomedArgument;
+	}
+
+	return argument;
+}
+
+boolean isUnresolvedRandomLabel(ProgramData* data, Line* line)
+{
+	return lhash_find(&data->randomLabelLines, &line->lineNumber) != NULL;
+}
+
 UserCommandResult handleSourceOperand(ProgramData* data, Line* line, const UserCommand* command)
 {
 	static char argumentWithSpaces[MAX_LINE_SIZE];
-	static char argument[MAX_LINE_SIZE];
+	static char argumentStorage[MAX_LINE_SIZE];
+	/* This way i can define a static storage but change where it is pointing to */
+	const char* argument = argumentStorage;
 	UserCommandResult result = nullInstruction();
 	Register* reg;
 
 	strtok_begin_cp(line->firstArgumentLoc, ",", argumentWithSpaces);
-	strtok_begin_cp(argumentWithSpaces, space_chars, argument);
+	strtok_begin_cp(argumentWithSpaces, space_chars, argumentStorage);
+
+	if (isRandomAddressing(argument))
+		argument = handleRandomAddressing(data, argument, &result, line);
 
 	if (isInstantAddressing(argument))
 	{
@@ -143,7 +242,8 @@ UserCommandResult handleSourceOperand(ProgramData* data, Line* line, const UserC
 			return result;
 		}
 
-		if (!data->inFirstRun)
+		/* If label name is pending from random access, the label name would be garbage */
+		if (!isUnresolvedRandomLabel(data, line))
 			handleDirectAddressing(argument, data, line, SourceArg, &result);
 	}
 	else
@@ -190,8 +290,7 @@ UserCommandResult handleDestOperand(ProgramData* data, Line* line, const UserCom
 			return result;
 		}
 
-		if (!data->inFirstRun)
-			handleDirectAddressing(argument, data, line, DestArg, &result);
+		handleDirectAddressing(argument, data, line, DestArg, &result);
 	}
 
 	return result;
@@ -219,6 +318,7 @@ void validateTwoArgCommandArgNum(const UserCommand* command, Line* line)
 	}
 }
 
+
 UserCommandResult genericTwoArgCommand(Line* line, const UserCommand* command, ProgramData* data)
 {
 	UserCommandResult result = nullInstruction();
@@ -242,6 +342,11 @@ UserCommandResult genericTwoArgCommand(Line* line, const UserCommand* command, P
 	}
 	else
 		result.instructionSize = 3;
+
+	if (hasRandomAddressing(&result))
+	{
+		putCommandAddrMethod(&result, RandomAddressing, SourceArg);
+	}
 
 	return result;
 }
@@ -311,8 +416,7 @@ UserCommandResult genericSingleArgCommand(Line* line, const UserCommand* command
 			return result;
 		}
 
-		if (!data->inFirstRun)
-			handleDirectAddressing(argument, data, line, DestArg, &result);
+		handleDirectAddressing(argument, data, line, DestArg, &result);
 	}
 	else /* Invalid label name, error printed by validateLabelName_ */
 	{
