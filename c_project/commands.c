@@ -48,7 +48,15 @@ boolean isInstantAddressing(const char* arg)
 
 void initExtFile(ProgramData* data)
 {
-	data->externalReferencesFile = getOutFile(data->inputFileName, EXT_FILE_NAME);
+	FILE* f = getOutFile(data->inputFileName, EXT_FILE_NAME);
+
+	if (f == NULL)
+	{
+		data->numberOfErrors++;
+		return;
+	}
+
+	data->externalReferencesFile = f;
 }
 
 void writeExternalReferenceToFile(ProgramData* data, Symbol* label, unsigned int address)
@@ -57,6 +65,12 @@ void writeExternalReferenceToFile(ProgramData* data, Symbol* label, unsigned int
 
 	if (data->externalReferencesFile == NULL)
 		initExtFile(data);
+
+	if (data->externalReferencesFile == NULL)
+	{
+		data->numberOfErrors++;
+		return;
+	}
 
 	to_32base(address, addr32base);
 	fprintf(data->externalReferencesFile, "%s %s\n", label->name, addr32base);
@@ -107,7 +121,7 @@ void handleInstantAddressing(const char* argument, Line* line, ArgType argType, 
 		putInstantArgument(result, number, argType);
 }
 
-#ifdef __DEBUG_
+#ifdef __DEBUG__
 
 int rand_range(int min_n, int max_n)
 {

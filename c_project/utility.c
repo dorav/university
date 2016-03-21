@@ -168,10 +168,11 @@ char* getFileNameWithExt(const char* inputFileName, const char* ext)
 	int outputFileNameLen = strlen(inputFileName) + strlen(ext) + 1;
 	char* outputFileName = calloc(1, outputFileNameLen);
 
-	token t = strtok_begin_cp(inputFileName, DIRECTORY_DELIMITERS, outputFileName);
+/*	token t = strtok_begin_cp(inputFileName, DIRECTORY_DELIMITERS, outputFileName);
 	while (strtok_next(t, DIRECTORY_DELIMITERS).start != NULL)
-		t = strtok_next_cp(t, DIRECTORY_DELIMITERS, outputFileName);
+		t = strtok_next_cp(t, DIRECTORY_DELIMITERS, outputFileName);*/
 
+	strcat(outputFileName, inputFileName);
 	strcat(outputFileName, ext);
 
 	return outputFileName;
@@ -185,7 +186,7 @@ FILE* getOutFile(const char* inputFileName, const char* extention)
 	file = fopen(outputFileName, "w");
 
 	if (file == NULL)
-		puts("BAD OUTPUT FILE");
+		printf("Can't open file \"%s\" for writing stopping this input file parsing.\n", outputFileName);
 
 	free (outputFileName);
 

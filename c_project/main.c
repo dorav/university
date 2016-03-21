@@ -62,12 +62,21 @@ void validateNumberOfArguments(int argc, char* argv[])
 
 FILE* getInputfile(const char* fileName)
 {
-	return fopen(fileName, "r");
+	FILE* f = fopen(fileName, "r");
+
+	if (f == NULL)
+		printf("Error, can't open file \"%s\" for reading, skipping.\n", fileName);
+
+	return f;
 }
 
-FILE* getObjectOutFile()
+FILE* getObjectOutFile(const char* outFileName)
 {
-	return fopen("ps.ob", "w");
+	FILE* f = fopen(outFileName, "w");
+	if (f == NULL)
+		printf("Can't open output file: \"%s\".\n", outFileName);
+
+	return f;
 }
 
 boolean getLine(Line* line, FILE* inputFile)
@@ -117,11 +126,10 @@ void prepareDataFor2ndRun(ProgramData* data)
 	data->data_counter = 0;
 }
 
-void firstRun(FILE* inputFile, ProgramData* data)
+void firstRunImpl(ProgramData* data, FILE* inputFile)
 {
 	UserCommandResult parsedLine;
 	Line line = { 0 };
-
 	data->inFirstRun = True;
 	while (getLine(&line, inputFile))
 	{
@@ -134,12 +142,25 @@ void firstRun(FILE* inputFile, ProgramData* data)
 			data->instruction_counter += parsedLine.instructionSize;
 		}
 	}
-
 	/* Error while fetching line */
 	if (line.hasError)
 		data->numberOfErrors++;
 
 	data->inFirstRun = False;
+}
+
+void firstRun(ProgramData* data)
+{
+	FILE* inputFile = getInputfile(data->inputFileName);
+
+	if(inputFile == NULL)
+	{
+		data->numberOfErrors++;
+		return;
+	}
+
+	firstRunImpl(data, inputFile);
+	fclose(inputFile);
 }
 
 void printDataStorage(ProgramData* data, FILE* objectOutFile)
@@ -150,20 +171,16 @@ void printDataStorage(ProgramData* data, FILE* objectOutFile)
 		printByte(objectOutFile, data->instruction_counter + i, data->dataStorage[i]);
 }
 
-void secondRun(ProgramData* data,
-			   FILE* inputFile,
-			   FILE* objectOutFile)
+void secondRunImpl(FILE* inputFile, ProgramData* data, FILE* objectOutFile)
 {
 	UserCommandResult parsed;
 	Line line = { 0 };
-
 	while (getLine(&line, inputFile))
 	{
 		if (shouldParse(&line))
 		{
 			parsed = parseLine(data, &line);
 			printInstruction(objectOutFile, data, parsed);
-
 			/* The print instruction needs to know the current instruction counter
 			 * thats why this can't be done inside parseLine */
 			data->instruction_counter += parsed.instructionSize;
@@ -171,6 +188,22 @@ void secondRun(ProgramData* data,
 	}
 
 	printDataStorage(data, objectOutFile);
+}
+
+void secondRun(ProgramData* data,
+			   FILE* objectOutFile)
+{
+	FILE* inputFile = getInputfile(data->inputFileName);
+
+	if (inputFile == NULL)
+	{
+		data->numberOfErrors++;
+		return;
+	}
+
+	secondRunImpl(inputFile, data, objectOutFile);
+
+	fclose(inputFile);
 }
 
 #define ENTRY_FILE_EXT ".ent"
@@ -239,16 +272,13 @@ void validateUnresolvedSymbols(ProgramData* data)
 	lhash_free(&data->unresolvedSymbols);
 }
 
-
-void writeEntriesFile(ProgramData* data, const char* inputFileName)
+void writeToEntriesFile(ProgramData* data, FILE* entriesFile)
 {
 	static char addr32base[10];
 
-	FILE* entriesFile = getOutFile(inputFileName, ENTRY_FILE_EXT);
 	lhash_iter i;
 	Symbol* entry;
 	Symbol* referencedLabel;
-
 	for (i = lhash_begin(&data->entries); i.isValid; lhash_set_next(&i))
 	{
 		entry = (Symbol*) i.current->data;
@@ -256,69 +286,82 @@ void writeEntriesFile(ProgramData* data, const char* inputFileName)
 		to_32base(referencedLabel->referencedMemAddr, addr32base);
 		fprintf(entriesFile, "%s %s\n", referencedLabel->name, addr32base);
 	}
+}
 
+void writeEntriesFile(ProgramData* data)
+{
+	FILE* entriesFile = getOutFile(data->inputFileName, ENTRY_FILE_EXT);
+
+	if (entriesFile == NULL)
+	{
+		data->numberOfErrors++;
+		return;
+	}
+
+	writeToEntriesFile(data, entriesFile);
 	fclose(entriesFile);
 }
 
-int main(int argc, char** argv)
+#define OBJECT_FILE_EXT ".ob"
+
+void writeData(ProgramData* data)
 {
-	FILE* inputFile;
-	FILE* objectOutFile;
-	ProgramData data = { 0 };
+	FILE* objectOutFile = getOutFile(data->inputFileName, OBJECT_FILE_EXT);
 
-	FILE* status = freopen("log", "w", stdout);
-	if (status == NULL)
-		puts("Bad redirect");
+	if (objectOutFile == NULL)
+		return;
 
-	srand(time(NULL));
+	printCounterHeader(objectOutFile, data);
 
-	validateNumberOfArguments(argc, argv);
+	prepareDataFor2ndRun(data);
 
-	data = initProgramData(argv[FILE_NAME_ARG_INDEX]);
+	secondRun(data, objectOutFile);
 
-	inputFile = getInputfile(data.inputFileName);
-	if (inputFile == NULL)
-		puts("BAD FILE");
+	fclose(objectOutFile);
 
-	firstRun(inputFile, &data);
+	if (data->entries.numberOfUsed > 0)
+		writeEntriesFile(data);
+}
 
-	fclose(inputFile);
+void runOnfile(const char* fileName)
+{
+	ProgramData data = initProgramData(fileName);
+
+	firstRun(&data);
 
 	validateEntries(&data);
 	validateUnresolvedSymbols(&data);
 
-	inputFile = getInputfile(data.inputFileName);
-
 	if (data.numberOfErrors == 0)
-	{
-		objectOutFile = getObjectOutFile();
+		writeData(&data);
 
-		if (objectOutFile == NULL)
-		{
-			puts("BAD OUTPUT FILE");
-		}
-
-		printCounterHeader(objectOutFile, &data);
-
-		prepareDataFor2ndRun(&data);
-
-		secondRun(&data, inputFile, objectOutFile);
-		fclose(objectOutFile);
-
-		if (data.entries.numberOfUsed > 0)
-			writeEntriesFile(&data, data.inputFileName);
-	}
+	if (data.externalReferencesFile != NULL)
+		fclose(data.externalReferencesFile);
 
 	lhash_free(&data.symbols);
 	lhash_free(&data.registers);
 	lhash_free(&data.entries);
 	ohash_free(&data.cmds);
-	free(data.dataStorage);
+	if (data.dataStorage != NULL)
+		free(data.dataStorage);
+}
+
+int main(int argc, char** argv)
+{
+	int i;
+	char* fileName;
+	FILE* status = freopen("log", "w", stdout);
+
+	srand(time(NULL));
+	validateNumberOfArguments(argc, argv);
+
+	for (i = 0; i < argc - FILE_NAME_ARG_INDEX; ++i)
+	{
+		fileName = argv[i + FILE_NAME_ARG_INDEX];
+		printf("Parsing input file - \"%s\"\n", fileName);
+		runOnfile(fileName);
+	}
+
 	fclose(status);
-	fclose(inputFile);
-
-	if (data.externalReferencesFile != NULL)
-		fclose(data.externalReferencesFile);
-
 	return 0;
 }

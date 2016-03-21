@@ -202,7 +202,7 @@ void initRandomLabelLines(ProgramData* data)
 
 ProgramData initProgramData(const char* inputFileName)
 {
-	ProgramData data = initCommandsTable(&data);
+	ProgramData data = initCommandsTable();
 	initSymbolsTable(&data);
 	initRegisters(&data);
 	initEntries(&data);
