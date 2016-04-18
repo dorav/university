@@ -1,0 +1,1 @@
+openu_video_fetcher.exe -u someone -d "c:\videos_directory" -p password -i 30303030 -l http://opal.openu.ac.il/mod/ouilvideocollection/view.php?id=4427357
