@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Net;
@@ -10,56 +11,6 @@ using System.Threading.Tasks;
 
 namespace openu_video_fetcher
 {
-    public class VideoData
-    {
-        public VideoData(string contextId, string courseId, string vid)
-        {
-            ContextId = contextId;
-            CourseId = courseId;
-            VidId = vid;
-        }
-
-        public string ContextId { get; set; }
-        public string CourseId { get; set; }
-        public string PlaylistUrl { get; set; }
-        public string VidId { get; set; }
-
-        public string formatCacheFileName()
-        {
-            return string.Format("{0}-{1}-{2}_addr", ContextId, CourseId, VidId);
-        }
-
-        public string formatPlaylistFile()
-        {
-            return formatCacheFileName() + "_file";
-        }
-
-        private string formatChunksFile(string quality)
-        {
-            return formatCacheFileName() + "_chunks_" + quality;
-        }
-
-        internal string formatChunksFileUrl(string wantedQuality)
-        {
-            return formatChunksFile(wantedQuality) + "_url";
-        }
-
-        internal string formatChunksFileContent(string wantedQuality)
-        {
-            return formatChunksFile(wantedQuality) + ".m3u8";
-        }
-
-        internal string formatFFmpegFile()
-        {
-            return formatCacheFileName() + ".m3u8";
-        }
-
-        internal object formatOutputFile()
-        {
-            return formatCacheFileName() + ".mp4";
-        }
-    }
-
     public class UrlFileCache
     {
         public UrlFileCache(DirectoryInfo input)
@@ -128,7 +79,7 @@ namespace openu_video_fetcher
 
         DirectoryInfo parentDir;
 
-        internal bool Contains(string key, string subDir = "")
+        internal bool HasFile(string key, string subDir = "")
         {
             var dstDir = Path.Combine(parentDir.FullName, subDir);
 
@@ -141,28 +92,38 @@ namespace openu_video_fetcher
                 return false;
             }
         }
+
+        internal string GetSubDir(string v)
+        {
+            var fullPath = Path.Combine(parentDir.FullName, v);
+            if (!Directory.Exists(fullPath))
+                parentDir.CreateSubdirectory(v);
+            return fullPath;
+        }
     }
 
     public class VideoDownloader
     {
         UrlFileCache cache;
-        VideoData data;
+        OpenuVideoData data;
         ChunksFile chunks;
         List<string> chunkNames;
         string baseUrl;
 
         string wantedQuality = "40000";
+        string wantedQuality2nd = "800000";
 
-        public VideoDownloader(UrlFileCache bank, VideoData data)
+        public VideoDownloader(UrlFileCache bank, OpenuVideoData data, BackgroundWorker changesReporter)
         {
             this.cache = bank;
             this.data = data;
             durations = new ConcurrentBag<TimeSpan>();
+            this.changesReporter = changesReporter;
         }
 
-        string requestPlaylist(VideoData data)
+        string requestPlaylist(OpenuVideoData data)
         {
-            var playlistFile = cache.GetContent(data.formatPlaylistFile(), data.VidId);
+            var playlistFile = cache.GetContent(data.formatPlaylistFile(), data.VideoId);
             if (playlistFile != null)
                 return playlistFile;
 
@@ -174,7 +135,7 @@ namespace openu_video_fetcher
                 return null;
             }
             playlistFile = new StreamReader(response.GetResponseStream()).ReadToEnd();
-            cache.PutContent(data.formatPlaylistFile(), playlistFile, data.VidId);
+            cache.PutContent(data.formatPlaylistFile(), playlistFile, data.VideoId);
             return playlistFile;
         }
 
@@ -187,18 +148,31 @@ namespace openu_video_fetcher
 
             new Thread(printProgress).Start();
 
-            Parallel.ForEach(chunkNames, new ParallelOptions { MaxDegreeOfParallelism = 20 }, 
+            Parallel.ForEach(chunkNames, new ParallelOptions { MaxDegreeOfParallelism = 10 }, 
                 chunkName => downloadChunk(chunkName));
 
-            var inputFile = cache.GetFile(data.formatFFmpegFile(), data.VidId);
+            var inputFile = cache.GetFile(data.formatFFmpegFile(), data.VideoId);
+            var outputFile = data.formatOutputFile();
 
+            if (File.Exists(outputFile))
+            {
+                try
+                {
+                    File.Delete(outputFile);
+                }
+                catch
+                {
+                    Console.WriteLine("Unable to combine video - '{0}', because the output file '{1}' exists", data.VideoId, outputFile);
+                    return;
+                }
+            }
 
             var p = new Process();
             p.StartInfo.UseShellExecute = false;
             p.StartInfo.RedirectStandardOutput = true;
             p.StartInfo.RedirectStandardError = true;
             p.StartInfo.FileName = Path.Combine("ffmpeg", "ffmpeg.exe");
-            p.StartInfo.Arguments = String.Format("-i \"{0}\" -c copy -bsf:a aac_adtstoasc {1}", inputFile, data.formatOutputFile());
+            p.StartInfo.Arguments = string.Format("-i \"{0}\" -c copy -bsf:a aac_adtstoasc {1}", inputFile, outputFile);
             p.StartInfo.WorkingDirectory = inputFile.Directory.FullName;
             p.Start();
 
@@ -207,13 +181,18 @@ namespace openu_video_fetcher
             Console.WriteLine(errors.ReadToEnd());
             Console.WriteLine(errors.ReadToEnd());
             p.WaitForExit();
+            
+            if (success)
+                cache.PutContent("done", "", data.VideoId);
         }
 
         private void printProgress()
         {
             Stopwatch totalRuntime = new Stopwatch();
             totalRuntime.Start();
-            while (total != counter)
+            int remainingUnits = totalUnits;
+            int downloaded = this.downloaded;
+            while (remainingUnits > 0)
             {
                 TimeSpan overallDuration = new TimeSpan();
                 foreach (var dur in durations)
@@ -221,16 +200,20 @@ namespace openu_video_fetcher
 
                 double average = 0;
                 long remainingMilli = 0;
-                if (counter != 0)
+                if (downloaded != 0)
                 {
-                    average = ((double)overallDuration.TotalMilliseconds) / counter;
-                    remainingMilli = (long)((double)totalRuntime.ElapsedMilliseconds / counter) * (total - counter);
+                    average = ((double)overallDuration.TotalSeconds) / downloaded;
+                    var timePerUnit = (long)((double)totalRuntime.ElapsedMilliseconds / downloaded);
+                    remainingMilli = timePerUnit * remainingUnits;
                 }
-                var remaining = TimeSpan.FromMilliseconds(remainingMilli);
+                var remainingTime = TimeSpan.FromMilliseconds(remainingMilli);
 
                 Console.WriteLine("Progress: remaining - {0}, {1} / {2}, active {3}, avg = {4}", 
-                                   remaining, counter, total, active, average);
+                                   remainingTime, preExistingUnits + downloaded, totalUnits, active, average);
                 Thread.Sleep((int)TimeSpan.FromSeconds(1).TotalMilliseconds);
+                downloaded = this.downloaded;
+                changesReporter.ReportProgress((downloaded + preExistingUnits) * 100 / totalUnits, new VideoProgress() { RemainingTime = remainingTime});
+                remainingUnits = totalUnits - downloaded - preExistingUnits;
             }
         }
 
@@ -242,21 +225,23 @@ namespace openu_video_fetcher
 
             foreach (var chunkName in allChunkNames)
             {
-                if (cache.Contains(chunkName, data.VidId))
-                    Console.WriteLine("Skipping '{0}' on {1}, piece exists.", chunkName, data.VidId);
-                else
+                if (!cache.HasFile(chunkName, data.VideoId))
                     chunkNames.Add(chunkName);
             }
 
-            total = chunkNames.Count;
+            Console.WriteLine("There exists {0}/{1} of the needed chunks, downloading {2} chunks.", 
+                               allChunkNames.Count - chunkNames.Count, allChunkNames.Count, chunkNames.Count);
+
+            totalUnits = allChunkNames.Count;
+            preExistingUnits = totalUnits - chunkNames.Count;
         }
 
         private ChunksFile getChunksFile(string playlistM3U8)
         {
             ChunksFile chunks = new ChunksFile();
 
-            chunks.Url = cache.GetContent(data.formatChunksFileUrl(wantedQuality), data.VidId);
-            chunks.Content = cache.GetContent(data.formatChunksFileContent(wantedQuality), data.VidId);
+            chunks.Url = cache.GetContent(data.formatChunksFileUrl(wantedQuality), data.VideoId);
+            chunks.Content = cache.GetContent(data.formatChunksFileContent(wantedQuality), data.VideoId);
 
             if (chunks.Content == null || chunks.Url == null)
                 chunks = fetchAndCacheChunksFile(playlistM3U8);
@@ -264,10 +249,13 @@ namespace openu_video_fetcher
             return chunks;
         }
 
-        int counter = 0;
+        int totalUnits = 0;
+        int downloaded = 0;
         int active = 0;
+        int preExistingUnits = 0;
+        bool success = true;
         ConcurrentBag<TimeSpan> durations;
-        int total;
+        private BackgroundWorker changesReporter;
 
         private void downloadChunk(string chunkName)
         {
@@ -281,29 +269,27 @@ namespace openu_video_fetcher
             do
                 try
                 {
-                    Console.WriteLine("Started downloading '{0}' on {1}.", chunkName, data.VidId);
                     var req = WebRequest.Create(baseUrl + "/" + chunkName);
                     var resp = req.GetResponse();
                     var chunkData = new BinaryReader(resp.GetResponseStream()).ReadBytes((int)resp.ContentLength);
 
-                    cache.PutBinary(chunkName, chunkData, data.VidId);
+                    cache.PutBinary(chunkName, chunkData, data.VideoId);
                     success = true;
                 }
                 catch
                 {
                     tryNum++;
-                    Console.WriteLine("Failed downloading '{0}' on {1}.", chunkName, data.VidId);
+                    Console.WriteLine("Failed downloading '{0}' on {1}.", chunkName, data.VideoId);
                 }
             while (tryNum < 3 && success == false);
 
-            if (success)
-                Console.WriteLine("Done downloading '{0}' on {1}.", chunkName, data.VidId);
-            else
+            if (!success)
             {
-                
+                // TODO   
+                success = false;
             }
 
-            Interlocked.Increment(ref counter);
+            Interlocked.Increment(ref downloaded);
             Interlocked.Decrement(ref active);
             w.Stop();
             durations.Add(w.Elapsed);
@@ -335,7 +321,7 @@ namespace openu_video_fetcher
                         }
                     }
                     wr.Close();
-                    cache.PutContent(data.formatFFmpegFile(), wr.ToString(), data.VidId);
+                    cache.PutContent(data.formatFFmpegFile(), wr.ToString(), data.VideoId);
                 }
             }
 
@@ -355,24 +341,50 @@ namespace openu_video_fetcher
             var resp = chunksReq.GetResponse();
             string chunksFile = new StreamReader(resp.GetResponseStream()).ReadToEnd();
 
-            cache.PutContent(data.formatChunksFileUrl(wantedQuality), chunksUrl, data.VidId);
-            cache.PutContent(data.formatChunksFileContent(wantedQuality), chunksFile, data.VidId);
+            cache.PutContent(data.formatChunksFileUrl(wantedQuality), chunksUrl, data.VideoId);
+            cache.PutContent(data.formatChunksFileContent(wantedQuality), chunksFile, data.VideoId);
 
             return new ChunksFile { Url = chunksUrl, Content = chunksFile };
         }
 
         private string getChunksFileUrl(string playlistM3U8)
         {
-            var qualityTester = new Regex(String.Format(":BANDWIDTH={0}", wantedQuality));
+            SortedDictionary<int, string> qualityToChunkLists = new SortedDictionary<int, string>();
+
+            var qualityTester = new Regex(String.Format(":BANDWIDTH=([0-9]*)", wantedQuality));
             var lines = playlistM3U8.Split('\n');
             for (int i = 0; i < lines.Length; i++)
             {
                 if (qualityTester.IsMatch(lines[i]))
                 {
-                    return lines[i + 1];
+                    string _qualityS = qualityTester.Match(lines[i]).Groups[1].Value;
+
+                    if (_qualityS == wantedQuality)
+                        return lines[i + 1];
+
+                    int quality = 0;
+                    int.TryParse(_qualityS, out quality);
+                    string chunkList = lines[i + 1];
+                    qualityToChunkLists[quality] = chunkList;
                 }
             }
-            return null;
+
+            if (qualityToChunkLists.ContainsKey(int.Parse(wantedQuality2nd)))
+                return qualityToChunkLists[int.Parse(wantedQuality2nd)];
+
+            // Can't find wanted qualities... going for 2nd best
+            KeyValuePair<int, string>[] sortedKeys = new KeyValuePair<int, string>[qualityToChunkLists.Count];
+            qualityToChunkLists.CopyTo(sortedKeys, 0);
+
+            // There may not be a 2nd best... 
+            if (sortedKeys.Length > 1)
+                return sortedKeys[sortedKeys.Length - 2].Value;
+
+            // This is an error. TODO: throw exception.
+            if (sortedKeys.Length == 0)
+                return null;
+
+            return sortedKeys[0].Value;
         }
     }
 }
